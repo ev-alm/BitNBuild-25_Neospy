@@ -1,5 +1,4 @@
-import { motion } from 'motion/react';
-import { Calendar, MapPin, Users, Star } from 'lucide-react';
+import { Calendar, MapPin, Users } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
 interface Badge {
@@ -20,60 +19,26 @@ interface BadgeCardProps {
   onClick?: () => void;
 }
 
-const rarityColors = {
-  common: 'from-slate-400 to-slate-500',
-  rare: 'from-blue-500 to-blue-600',
-  epic: 'from-purple-500 to-purple-600',
-  legendary: 'from-yellow-500 to-yellow-600'
-};
-
-const rarityBorder = {
-  common: 'border-slate-300',
-  rare: 'border-blue-300',
-  epic: 'border-purple-300',
-  legendary: 'border-yellow-300'
-};
-
 export default function BadgeCard({ badge, size = 'medium', showDetails = false, onClick }: BadgeCardProps) {
   const isLarge = size === 'large';
   const isMedium = size === 'medium';
   
   return (
-    <motion.div
+    <div
       className={`
         relative group cursor-pointer
         ${isLarge ? 'w-80 h-96' : isMedium ? 'w-64 h-80' : 'w-48 h-60'}
       `}
       onClick={onClick}
-      whileHover={{ 
-        scale: 1.02,
-        y: -4
-      }}
-      whileTap={{ scale: 0.98 }}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
     >
       {/* Card Container */}
       <div 
-        className={`
-          relative w-full h-full badge-card
-          ${rarityBorder[badge.rarity]}
-          border-2
-        `}
+        className="relative w-full h-full badge-card border border-slate-200 hover:shadow-md transition-shadow"
       >
-        {/* Rarity Badge */}
+        {/* Event Type Badge */}
         <div className="absolute top-3 right-3 z-20">
-          <div 
-            className={`
-              px-3 py-1 rounded-full text-xs font-semibold text-white
-              bg-gradient-to-r ${rarityColors[badge.rarity]}
-              flex items-center space-x-1
-              shadow-sm
-            `}
-          >
-            <Star className="w-3 h-3" />
-            <span className="capitalize">{badge.rarity}</span>
+          <div className="px-3 py-1 rounded-full text-xs font-medium text-slate-700 bg-white/90 shadow-sm border border-slate-200">
+            POAP
           </div>
         </div>
 
@@ -102,12 +67,7 @@ export default function BadgeCard({ badge, size = 'medium', showDetails = false,
           </div>
 
           {showDetails && (
-            <motion.div 
-              className="space-y-2 text-xs text-slate-500"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
+            <div className="space-y-2 text-xs text-slate-500">
               <div className="flex items-center space-x-2">
                 <Calendar className="w-3 h-3" />
                 <span>{new Date(badge.date).toLocaleDateString()}</span>
@@ -122,20 +82,20 @@ export default function BadgeCard({ badge, size = 'medium', showDetails = false,
                 <Users className="w-3 h-3" />
                 <span>{badge.attendees.toLocaleString()} attendees</span>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* Simple Progress Bar for Collection */}
           {!showDetails && (
             <div className="w-full bg-slate-200 rounded-full h-1">
               <div 
-                className={`h-1 rounded-full bg-gradient-to-r ${rarityColors[badge.rarity]}`}
+                className="h-1 rounded-full bg-blue-600"
                 style={{ width: '100%' }}
               />
             </div>
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

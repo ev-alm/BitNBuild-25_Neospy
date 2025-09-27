@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
 import { Mail, Lock, ArrowLeft, Crown, Users } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -50,12 +49,7 @@ export default function LoginPage({ onLogin, onSwitchToSignUp, onBack, defaultRo
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
-      <motion.div
-        className="w-full max-w-md"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      <div className="w-full max-w-md">
         {/* Back Button */}
         <Button
           type="button"
@@ -88,7 +82,7 @@ export default function LoginPage({ onLogin, onSwitchToSignUp, onBack, defaultRo
                 const isSelected = formData.role === role.id;
                 
                 return (
-                  <motion.button
+                  <button
                     key={role.id}
                     type="button"
                     onClick={() => setFormData(prev => ({ ...prev, role: role.id as 'organizer' | 'user' }))}
@@ -99,12 +93,10 @@ export default function LoginPage({ onLogin, onSwitchToSignUp, onBack, defaultRo
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                       }
                     `}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
                   >
                     <Icon className="w-4 h-4" />
                     <span>{role.label}</span>
-                  </motion.button>
+                  </button>
                 );
               })}
             </div>
@@ -172,7 +164,7 @@ export default function LoginPage({ onLogin, onSwitchToSignUp, onBack, defaultRo
             </p>
           </div>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }

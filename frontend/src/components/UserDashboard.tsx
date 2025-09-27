@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
 import { 
   Trophy, 
   User, 
@@ -12,8 +11,7 @@ import {
   Plus,
   Award,
   TrendingUp,
-  Clock,
-  Sparkles
+  Clock
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -104,7 +102,7 @@ export default function UserDashboard({ user, onToast }: UserDashboardProps) {
           <Button
             onClick={() => setCurrentView('dashboard')}
             variant="outline"
-            className="glass-card border-purple-400/30 text-purple-200 hover:text-white"
+            className="professional-card border text-neutral-gray hover:text-primary-blue"
           >
             ← Back to Dashboard
           </Button>
@@ -120,12 +118,12 @@ export default function UserDashboard({ user, onToast }: UserDashboardProps) {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">POAP Wallet</h1>
-            <p className="text-purple-300">Manage your digital collectibles currency</p>
+            <p className="text-neutral-gray">Manage your digital collectibles currency</p>
           </div>
           <Button
             onClick={() => setCurrentView('dashboard')}
             variant="outline"
-            className="glass-card border-purple-400/30 text-purple-200 hover:text-white"
+            className="professional-card border text-neutral-gray hover:text-primary-blue"
           >
             ← Back to Dashboard
           </Button>
@@ -139,24 +137,24 @@ export default function UserDashboard({ user, onToast }: UserDashboardProps) {
           />
           
           {/* Wallet Info */}
-          <Card className="glass-card border-purple-400/30">
+          <Card className="professional-card border-0 shadow-sm bg-white">
             <CardHeader>
-              <CardTitle className="text-white">Wallet Details</CardTitle>
+              <CardTitle className="text-slate-900">Wallet Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-purple-400 text-sm font-medium mb-1">Wallet Address</p>
-                <code className="text-xs text-purple-200 bg-purple-900/20 rounded-lg p-2 block break-all">
+                <p className="text-slate-600 text-sm font-medium mb-1">Wallet Address</p>
+                <code className="text-xs text-slate-900 bg-slate-100 rounded-lg p-2 block break-all">
                   {user.walletAddress}
                 </code>
               </div>
               <div>
-                <p className="text-purple-400 text-sm font-medium mb-1">Account Type</p>
-                <p className="text-white capitalize">{user.role}</p>
+                <p className="text-slate-600 text-sm font-medium mb-1">Account Type</p>
+                <p className="text-slate-900 capitalize font-medium">{user.role}</p>
               </div>
               <div>
-                <p className="text-purple-400 text-sm font-medium mb-1">Total Badges</p>
-                <p className="text-white">{stats.totalBadges} POAPs</p>
+                <p className="text-slate-600 text-sm font-medium mb-1">Total Badges</p>
+                <p className="text-slate-900 font-medium">{stats.totalBadges} POAPs</p>
               </div>
             </CardContent>
           </Card>
@@ -171,35 +169,35 @@ export default function UserDashboard({ user, onToast }: UserDashboardProps) {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">My Collection</h1>
-            <p className="text-purple-300">Your digital trophy showcase</p>
+            <p className="text-neutral-gray">Your digital trophy showcase</p>
           </div>
           <Button
             onClick={() => setCurrentView('dashboard')}
             variant="outline"
-            className="glass-card border-purple-400/30 text-purple-200 hover:text-white"
+            className="professional-card border text-neutral-gray hover:text-primary-blue"
           >
             ← Back to Dashboard
           </Button>
         </div>
 
         {/* Collection Controls */}
-        <div className="glass-card rounded-2xl p-6">
+        <div className="professional-card border-0 shadow-sm bg-white rounded-lg p-6">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-purple-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
                 placeholder="Search badges..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 glass-card border-purple-400/30 text-white placeholder:text-purple-300/50"
+                className="pl-10 border-slate-200 focus:border-blue-600"
               />
             </div>
             
             <Select value={filterRarity} onValueChange={setFilterRarity}>
-              <SelectTrigger className="w-40 glass-card border-purple-400/30 text-white">
+              <SelectTrigger className="w-40 border-slate-200">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="glass-card border-purple-400/30 bg-purple-900/90">
+              <SelectContent>
                 <SelectItem value="all">All Rarities</SelectItem>
                 <SelectItem value="legendary">Legendary</SelectItem>
                 <SelectItem value="epic">Epic</SelectItem>
@@ -212,59 +210,53 @@ export default function UserDashboard({ user, onToast }: UserDashboardProps) {
 
         {/* Badge Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBadges.map((badge, index) => (
-            <motion.div
+          {filteredBadges.map((badge) => (
+            <BadgeCard
               key={badge.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <BadgeCard
-                badge={badge}
-                onClick={() => setSelectedBadge(badge)}
-              />
-            </motion.div>
+              badge={badge}
+              onClick={() => setSelectedBadge(badge)}
+            />
           ))}
         </div>
 
         {/* Badge Detail Modal */}
         <Dialog open={!!selectedBadge} onOpenChange={() => setSelectedBadge(null)}>
-          <DialogContent className="glass-card border-purple-400/30 max-w-md">
+          <DialogContent className="professional-card max-w-md">
             {selectedBadge && (
               <>
                 <DialogHeader>
-                  <DialogTitle className="text-white">{selectedBadge.name}</DialogTitle>
+                  <DialogTitle className="text-slate-900">{selectedBadge.name}</DialogTitle>
                 </DialogHeader>
                 
                 <div className="space-y-4">
                   <img
                     src={selectedBadge.image}
                     alt={selectedBadge.name}
-                    className="w-full h-48 object-cover rounded-xl"
+                    className="w-full h-48 object-cover rounded-lg"
                   />
                   
                   <div className="space-y-2 text-sm">
-                    <p className="text-purple-200">{selectedBadge.description}</p>
+                    <p className="text-slate-600">{selectedBadge.description}</p>
                     
                     <div className="grid grid-cols-2 gap-4 pt-4">
                       <div>
-                        <p className="text-purple-400 font-medium">Event</p>
-                        <p className="text-white">{selectedBadge.event}</p>
+                        <p className="text-slate-600 font-medium">Event</p>
+                        <p className="text-slate-900 font-semibold">{selectedBadge.event}</p>
                       </div>
                       
                       <div>
-                        <p className="text-purple-400 font-medium">Date</p>
-                        <p className="text-white">{selectedBadge.date}</p>
+                        <p className="text-slate-600 font-medium">Date</p>
+                        <p className="text-slate-900 font-semibold">{selectedBadge.date}</p>
                       </div>
                       
                       <div>
-                        <p className="text-purple-400 font-medium">Location</p>
-                        <p className="text-white">{selectedBadge.location}</p>
+                        <p className="text-slate-600 font-medium">Location</p>
+                        <p className="text-slate-900 font-semibold">{selectedBadge.location}</p>
                       </div>
                       
                       <div>
-                        <p className="text-purple-400 font-medium">Rarity</p>
-                        <p className="text-white capitalize">{selectedBadge.rarity}</p>
+                        <p className="text-slate-600 font-medium">Rarity</p>
+                        <p className="text-slate-900 font-semibold capitalize">{selectedBadge.rarity}</p>
                       </div>
                     </div>
                   </div>
@@ -280,203 +272,159 @@ export default function UserDashboard({ user, onToast }: UserDashboardProps) {
   return (
     <div className="space-y-8">
       {/* Header with Profile */}
-      <motion.div 
-        className="flex items-center justify-between"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center space-x-4">
-          <Avatar className="w-16 h-16 border-2 border-purple-400/50">
+          <Avatar className="w-16 h-16 border-3 border-white shadow-lg">
             <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback className="bg-purple-500/20 text-purple-400">
+            <AvatarFallback className="bg-gradient-to-r from-blue-600 to-teal-600 text-white text-lg font-semibold">
               {user.name.charAt(0)}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-3xl font-bold">Welcome, {user.name}!</h1>
-            <p className="text-purple-300">Collector • {stats.totalBadges} POAPs earned</p>
-            <div className="flex items-center space-x-2 mt-1">
-              <Wallet className="w-4 h-4 text-purple-400" />
-              <span className="text-purple-300">{stats.walletBalance} POAP</span>
+            <h1 className="text-3xl font-bold text-slate-900 mb-1">Welcome, {user.name}!</h1>
+            <p className="text-slate-600 mb-2">Collector • {stats.totalBadges} POAPs earned</p>
+            <div className="flex items-center space-x-2">
+              <Wallet className="w-4 h-4 text-blue-600" />
+              <span className="text-slate-700 font-medium">{stats.walletBalance} POAP</span>
             </div>
           </div>
         </div>
         
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <Button
+          onClick={() => setCurrentView('claim')}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-sm"
         >
-          <Button
-            onClick={() => setCurrentView('claim')}
-            className="glow-button px-6 py-3 text-lg rounded-xl"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Claim POAP
-          </Button>
-        </motion.div>
-      </motion.div>
+          <Plus className="w-4 h-4 mr-2" />
+          Claim POAP
+        </Button>
+      </div>
 
       {/* Stats Grid */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           {
             title: 'Total POAPs',
             value: stats.totalBadges,
             icon: Trophy,
-            color: 'from-yellow-400 to-orange-500'
+            color: 'bg-[#1e40af]'
           },
           {
-            title: 'Legendary',
-            value: stats.legendary,
-            icon: Star,
-            color: 'from-purple-400 to-purple-600'
+            title: 'Recent Events',
+            value: stats.totalBadges,
+            icon: Calendar,
+            color: 'bg-[#0f766e]'
           },
           {
-            title: 'Epic',
-            value: stats.epic,
+            title: 'This Month',
+            value: 2,
             icon: Award,
-            color: 'from-pink-400 to-pink-600'
+            color: 'bg-[#059669]'
           },
           {
-            title: 'Rare',
-            value: stats.rare,
-            icon: TrendingUp,
-            color: 'from-blue-400 to-blue-600'
+            title: 'Wallet Balance',
+            value: `${stats.walletBalance}`,
+            icon: Wallet,
+            color: 'bg-[#1e40af]'
           }
-        ].map((stat, index) => {
+        ].map((stat) => {
           const Icon = stat.icon;
           
           return (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + index * 0.1 }}
-            >
-              <Card className="glass-card border-purple-400/30 hover:border-purple-400/50 transition-colors">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-300 text-sm font-medium">{stat.title}</p>
-                      <p className="text-2xl font-bold text-white">{stat.value}</p>
-                    </div>
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
-                      <Icon className="w-6 h-6 text-white" />
-                    </div>
+            <Card key={stat.title} className="professional-card border-0 shadow-sm bg-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">{stat.title}</p>
+                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                  <div className={`p-3 rounded-lg ${stat.color}`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           );
         })}
-      </motion.div>
+      </div>
 
       {/* Recent Badges */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card className="glass-card border-purple-400/30">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Trophy className="w-5 h-5 text-purple-400" />
-                <span>Recent POAPs</span>
-              </CardTitle>
-              <Button
-                onClick={() => setCurrentView('collection')}
-                variant="outline"
-                className="glass-card border-purple-400/30 text-purple-200 hover:text-white"
-              >
-                View All
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {badges.slice(0, 3).map((badge, index) => (
-                <motion.div
-                  key={badge.id}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 + index * 0.1 }}
-                >
-                  <BadgeCard
-                    badge={badge}
-                    size="small"
-                    onClick={() => setSelectedBadge(badge)}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <Card className="professional-card border-0 shadow-sm bg-white">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2 text-slate-900">
+              <Trophy className="w-5 h-5 text-blue-600" />
+              <span>Recent POAPs</span>
+            </CardTitle>
+            <Button
+              onClick={() => setCurrentView('collection')}
+              variant="outline"
+              className="text-slate-600 hover:text-slate-900 border-slate-200"
+            >
+              View All
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {badges.slice(0, 3).map((badge) => (
+              <BadgeCard
+                key={badge.id}
+                badge={badge}
+                size="small"
+                onClick={() => setSelectedBadge(badge)}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card className="glass-card border-purple-400/30">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-white">
-              <Sparkles className="w-5 h-5 text-purple-400" />
-              <span>Quick Actions</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                {
-                  title: 'Claim POAP',
-                  description: 'Scan QR code to claim new badge',
-                  icon: Plus,
-                  action: () => setCurrentView('claim')
-                },
-                {
-                  title: 'Browse Collection',
-                  description: 'View all your earned badges',
-                  icon: Trophy,
-                  action: () => setCurrentView('collection')
-                },
-                {
-                  title: 'Wallet',
-                  description: 'Manage your POAP wallet',
-                  icon: Wallet,
-                  action: () => setCurrentView('wallet')
-                }
-              ].map((action, index) => {
-                const Icon = action.icon;
-                
-                return (
-                  <motion.button
-                    key={action.title}
-                    onClick={action.action}
-                    className="glass-card rounded-xl p-4 text-left hover:bg-white/5 transition-colors group"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 + index * 0.1 }}
-                  >
-                    <Icon className="w-8 h-8 text-purple-400 mb-3 group-hover:text-purple-300 transition-colors" />
-                    <h3 className="font-bold text-white mb-1">{action.title}</h3>
-                    <p className="text-sm text-purple-300">{action.description}</p>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <Card className="professional-card border-0 shadow-sm bg-white">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-slate-900">
+            <Plus className="w-5 h-5 text-blue-600" />
+            <span>Quick Actions</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                title: 'Claim POAP',
+                description: 'Scan QR code to claim new badge',
+                icon: Plus,
+                action: () => setCurrentView('claim')
+              },
+              {
+                title: 'Browse Collection',
+                description: 'View all your earned badges',
+                icon: Trophy,
+                action: () => setCurrentView('collection')
+              },
+              {
+                title: 'Wallet',
+                description: 'Manage your POAP wallet',
+                icon: Wallet,
+                action: () => setCurrentView('wallet')
+              }
+            ].map((action) => {
+              const Icon = action.icon;
+              
+              return (
+                <button
+                  key={action.title}
+                  onClick={action.action}
+                  className="professional-card rounded-lg p-6 text-left hover:shadow-md transition-all duration-200 group border border-slate-200"
+                >
+                  <Icon className="w-8 h-8 text-blue-600 mb-3 group-hover:text-blue-700 transition-colors" />
+                  <h3 className="font-semibold text-slate-900 mb-1">{action.title}</h3>
+                  <p className="text-sm text-slate-600">{action.description}</p>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
-import { Upload, QrCode, Eye, Sparkles, Calendar, MapPin, FileText, ImageIcon } from 'lucide-react';
+import { Upload, QrCode, Eye, Plus, Calendar, MapPin, FileText, ImageIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -50,33 +49,25 @@ export default function CreateEventPage({ onToast }: CreateEventPageProps) {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <motion.div 
-        className="text-center space-y-4"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold">Create Event Badge</h1>
-        <p className="text-purple-300 max-w-2xl mx-auto">
+        <p className="text-neutral-gray max-w-2xl mx-auto">
           Design a unique POAP badge for your event. Attendees will be able to claim this digital collectible as proof of their presence.
         </p>
-      </motion.div>
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Form Section */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div className="glass-card rounded-3xl p-8 space-y-6">
+        <div>
+          <div className="professional-card rounded-3xl p-8 space-y-6">
             <div className="flex items-center space-x-3 mb-6">
-              <Sparkles className="w-6 h-6 text-purple-400" />
-              <h2 className="text-xl font-bold text-white">Event Details</h2>
+              <Plus className="w-6 h-6 text-[--accent-teal]" />
+              <h2 className="text-xl font-bold text-foreground">Event Details</h2>
             </div>
 
             {/* Event Name */}
             <div className="space-y-2">
-              <Label className="flex items-center space-x-2 text-purple-200">
+              <Label className="flex items-center space-x-2 text-foreground">
                 <FileText className="w-4 h-4" />
                 <span>Event Name</span>
               </Label>
@@ -84,13 +75,13 @@ export default function CreateEventPage({ onToast }: CreateEventPageProps) {
                 placeholder="e.g., DevCon 2024, Art Gallery Opening"
                 value={eventData.name}
                 onChange={(e) => setEventData(prev => ({ ...prev, name: e.target.value }))}
-                className="glass-card border-purple-400/30 text-white placeholder:text-purple-300/50"
+                className="professional-card border text-foreground placeholder:text-neutral-gray/50"
               />
             </div>
 
             {/* Date */}
             <div className="space-y-2">
-              <Label className="flex items-center space-x-2 text-purple-200">
+              <Label className="flex items-center space-x-2 text-foreground">
                 <Calendar className="w-4 h-4" />
                 <span>Event Date</span>
               </Label>
@@ -98,13 +89,13 @@ export default function CreateEventPage({ onToast }: CreateEventPageProps) {
                 type="datetime-local"
                 value={eventData.date}
                 onChange={(e) => setEventData(prev => ({ ...prev, date: e.target.value }))}
-                className="glass-card border-purple-400/30 text-white"
+                className="professional-card border text-foreground"
               />
             </div>
 
             {/* Location */}
             <div className="space-y-2">
-              <Label className="flex items-center space-x-2 text-purple-200">
+              <Label className="flex items-center space-x-2 text-foreground">
                 <MapPin className="w-4 h-4" />
                 <span>Location</span>
               </Label>
@@ -112,24 +103,24 @@ export default function CreateEventPage({ onToast }: CreateEventPageProps) {
                 placeholder="e.g., San Francisco, CA or Virtual Event"
                 value={eventData.location}
                 onChange={(e) => setEventData(prev => ({ ...prev, location: e.target.value }))}
-                className="glass-card border-purple-400/30 text-white placeholder:text-purple-300/50"
+                className="professional-card border text-foreground placeholder:text-neutral-gray/50"
               />
             </div>
 
             {/* Description */}
             <div className="space-y-2">
-              <Label className="text-purple-200">Event Description</Label>
+              <Label className="text-foreground">Event Description</Label>
               <Textarea
                 placeholder="Describe your event and what makes it special..."
                 value={eventData.description}
                 onChange={(e) => setEventData(prev => ({ ...prev, description: e.target.value }))}
-                className="glass-card border-purple-400/30 text-white placeholder:text-purple-300/50 min-h-[100px]"
+                className="professional-card border text-foreground placeholder:text-neutral-gray/50 min-h-[100px]"
               />
             </div>
 
             {/* Badge Image Upload */}
             <div className="space-y-2">
-              <Label className="flex items-center space-x-2 text-purple-200">
+              <Label className="flex items-center space-x-2 text-foreground">
                 <ImageIcon className="w-4 h-4" />
                 <span>Badge Artwork</span>
               </Label>
@@ -143,11 +134,11 @@ export default function CreateEventPage({ onToast }: CreateEventPageProps) {
                 />
                 <label
                   htmlFor="badge-upload"
-                  className="flex items-center justify-center w-full h-24 glass-card border-2 border-dashed border-purple-400/30 rounded-xl cursor-pointer hover:border-purple-400/50 transition-colors"
+                  className="flex items-center justify-center w-full h-24 professional-card border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-[--accent-teal] transition-colors"
                 >
                   <div className="text-center">
-                    <Upload className="w-6 h-6 mx-auto mb-2 text-purple-400" />
-                    <p className="text-sm text-purple-300">
+                    <Upload className="w-6 h-6 mx-auto mb-2 text-[--accent-teal]" />
+                    <p className="text-sm text-neutral-gray">
                       {eventData.badgeImage ? 'Change Image' : 'Upload Badge Image'}
                     </p>
                   </div>
@@ -160,14 +151,14 @@ export default function CreateEventPage({ onToast }: CreateEventPageProps) {
               <Button
                 onClick={() => setPreviewBadge(!previewBadge)}
                 variant="outline"
-                className="flex-1 glass-card border-purple-400/30 text-purple-200 hover:text-white"
+                className="flex-1 professional-card border text-neutral-gray hover:text-primary-blue"
               >
                 <Eye className="w-4 h-4 mr-2" />
                 {previewBadge ? 'Hide Preview' : 'Preview Badge'}
               </Button>
               
               <Button 
-                className="flex-1 glow-button"
+                className="flex-1 primary-button"
                 onClick={() => {
                   onToast({
                     title: '🎉 Event Created Successfully!',
@@ -180,72 +171,43 @@ export default function CreateEventPage({ onToast }: CreateEventPageProps) {
               </Button>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Preview Section */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-6"
-        >
+        <div className="space-y-6">
           {/* Badge Preview */}
           {previewBadge && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex justify-center"
-            >
+            <div className="flex justify-center">
               <BadgeCard 
                 badge={mockBadge} 
                 size="large" 
                 showDetails={true}
               />
-            </motion.div>
+            </div>
           )}
 
           {/* QR Code Section */}
-          <div className="glass-card rounded-3xl p-8 text-center">
+          <div className="professional-card rounded-3xl p-8 text-center">
             <div className="flex items-center justify-center space-x-3 mb-6">
-              <QrCode className="w-6 h-6 text-purple-400" />
-              <h3 className="text-xl font-bold text-white">Claim QR Code</h3>
+              <QrCode className="w-6 h-6 text-[--accent-teal]" />
+              <h3 className="text-xl font-bold text-foreground">Claim QR Code</h3>
             </div>
             
             <div className="relative inline-block">
-              <motion.div
-                className="glass-card p-4 rounded-2xl inline-block"
-                animate={{ 
-                  boxShadow: [
-                    '0 0 20px rgba(139, 92, 246, 0.3)',
-                    '0 0 40px rgba(139, 92, 246, 0.5)',
-                    '0 0 20px rgba(139, 92, 246, 0.3)'
-                  ]
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
+              <div className="professional-card p-4 rounded-2xl inline-block">
                 <img
                   src={generateQRCode()}
                   alt="POAP Claim QR Code"
                   className="w-48 h-48 rounded-xl"
                 />
-              </motion.div>
-              
-              {/* Holographic Effect */}
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-2xl"
-                animate={{ 
-                  opacity: [0.3, 0.6, 0.3],
-                  scale: [1, 1.05, 1]
-                }}
-                transition={{ duration: 3, repeat: Infinity }}
-              />
+              </div>
             </div>
             
-            <p className="text-purple-300 mt-4 text-sm">
+            <p className="text-neutral-gray mt-4 text-sm">
               Attendees scan this code to claim their POAP badge
             </p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
