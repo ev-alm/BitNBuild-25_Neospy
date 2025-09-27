@@ -1,0 +1,330 @@
+// --- Authentication API Endpoints ---
+
+/**
+ * @api {post} /auth/login Traditional email/password login
+ * @body {string} email - User's email address
+ * @body {string} password - User's password
+ * @body {string} role - 'organizer' or 'user'
+ */
+app.post('/auth/login', async (req, res) => {
+    const { email, password, role } = req.body;
+
+    // Validation
+    if (!email || !password || !role) {
+        return res.status(400).json({ 
+            error: 'Email, password, and role are required.' 
+        });
+    }
+
+    if (!email.includes('@')) {
+        return res.status(400).json({ error: 'Valid email is required.' });
+    }
+
+    if (role !== 'user' && role !== 'organizer') {
+        return res.status(400).json({ error: 'Role must be either "user" or "organizer".' });
+    }
+
+    console.log(`Login attempt: ${email} as ${role}`);
+
+    try {
+        const db = await dbPromise;
+
+        // Find user by email and role
+        const user = await db.get(
+            'SELECT * FROM users WHERE email = ? AND userType = ?',
+            [email, role]
+        );
+
+        if (!user) {
+            return res.status(404).json({ 
+                error: 'Account not found. Please check your email and role.' 
+            });
+        }
+
+        // In a real application, you would use bcrypt to compare hashed passwords
+        // For now, we'll simulate password checking
+        const isValidPassword = await simulatePasswordCheck(password, user.password);
+        
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid password.' });
+        }
+
+        // Prepare user data based on type
+        let userData;
+        if (user.userType === 'user') {
+            userData = {
+                id: user.id,
+                walletAddress: user.walletAddress,
+                username: user.username,
+                displayName: user.displayName,
+                email: user.email,
+                userType: user.userType,
+                createdAt: user.createdAt
+            };
+        } else if (user.userType === 'organizer') {
+            userData = {
+                id: user.id,
+                walletAddress: user.walletAddress,
+                companyName: user.companyName,
+                email: user.email,
+                website: user.website,
+                description: user.description,
+                userType: user.userType,
+                createdAt: user.createdAt
+            };
+        }
+
+        // Generate JWT token (simplified - in production use proper JWT)
+        const token = generateToken(userData);
+
+        console.log(`Successful login: ${email} (${user.userType})`);
+        res.status(200).json({ 
+            success: true,
+            message: 'Login successful!',
+            token: token,
+            user: userData
+        });
+
+    } catch (error) {
+        console.error('Error during login:', error);
+        res.status(500).json({ error: 'Failed to login.' });
+    }
+});
+
+/**
+ * @api {post} /auth/register Register a new user/organizer with email/password
+ * @body {string} email - User's email address
+ * @body {string} password - User's password
+ * @body {string} role - 'organizer' or 'user'
+ * @body {string} displayName - User's display name (for users)
+ * @body {string} companyName - Organization name (for organizers)
+ * @body {string} username - Unique username (for users, optional)
+ * @body {string} website - Website (for organizers, optional)
+ * @body {string} description - Description (for organizers, optional)
+ */
+app.post('/auth/register', async (req, res) => {
+    const { 
+        email, 
+        password, 
+        role, 
+        displayName, 
+        companyName, 
+        username, 
+        website, 
+        description 
+    } = req.body;
+
+    // Validation
+    if (!email || !password || !role) {
+        return res.status(400).json({ error: 'Email, password, and role are required.' });
+    }
+
+    if (!email.includes('@')) {
+        return res.status(400).json({ error: 'Valid email is required.' });
+    }
+
+    if (role === 'user' && !displayName) {
+        return res.status(400).json({ error: 'Display name is required for users.' });
+    }
+
+    if (role === 'organizer' && !companyName) {
+        return res.status(400).json({ error: 'Company name is required for organizers.' });
+    }
+
+    try {
+        const db = await dbPromise;
+
+        // Check if email already exists
+        const existingUser = await db.get(
+            'SELECT id FROM users WHERE email = ?',
+            [email]
+        );
+
+        if (existingUser) {
+            return res.status(409).json({ error: 'Email already registered.' });
+        }
+
+        // Check if username already exists (for users)
+        if (role === 'user' && username) {
+            const existingUsername = await db.get(
+                'SELECT id FROM users WHERE username = ?',
+                [username]
+            );
+            if (existingUsername) {
+                return res.status(409).json({ error: 'Username already taken.' });
+            }
+        }
+
+        // Generate a wallet address for the user (simulated)
+        const walletAddress = await generateWalletAddress();
+        
+        // Hash password (in production, use bcrypt)
+        const hashedPassword = await hashPassword(password);
+
+        // Insert user based on role
+        let result;
+        if (role === 'user') {
+            result = await db.run(
+                `INSERT INTO users (
+                    walletAddress, username, email, displayName, password, userType, createdAt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [walletAddress, username || '', email, displayName, hashedPassword, 'user', new Date().toISOString()]
+            );
+        } else {
+            result = await db.run(
+                `INSERT INTO users (
+                    walletAddress, companyName, email, website, description, password, userType, createdAt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [walletAddress, companyName, email, website || '', description || '', hashedPassword, 'organizer', new Date().toISOString()]
+            );
+        }
+
+        // Get the newly created user
+        const newUser = await db.get(
+            'SELECT * FROM users WHERE id = ?',
+            [result.lastID]
+        );
+
+        // Prepare response data
+        let userData;
+        if (newUser.userType === 'user') {
+            userData = {
+                id: newUser.id,
+                walletAddress: newUser.walletAddress,
+                username: newUser.username,
+                displayName: newUser.displayName,
+                email: newUser.email,
+                userType: newUser.userType,
+                createdAt: newUser.createdAt
+            };
+        } else {
+            userData = {
+                id: newUser.id,
+                walletAddress: newUser.walletAddress,
+                companyName: newUser.companyName,
+                email: newUser.email,
+                website: newUser.website,
+                description: newUser.description,
+                userType: newUser.userType,
+                createdAt: newUser.createdAt
+            };
+        }
+
+        // Generate token
+        const token = generateToken(userData);
+
+        console.log(`New ${role} registered: ${email}`);
+        res.status(201).json({ 
+            success: true,
+            message: 'Registration successful!',
+            token: token,
+            user: userData
+        });
+
+    } catch (error) {
+        console.error('Error during registration:', error);
+        res.status(500).json({ error: 'Failed to register.' });
+    }
+});
+
+// --- Helper Functions for Authentication ---
+
+/**
+ * Simulate password checking (in production, use bcrypt.compare)
+ */
+async function simulatePasswordCheck(inputPassword, storedHash) {
+    // In a real application, you would use:
+    // return await bcrypt.compare(inputPassword, storedHash);
+    
+    // For simulation purposes, we'll use a simple check
+    // In production, NEVER store passwords like this
+    return inputPassword === 'password123'; // Default password for testing
+}
+
+/**
+ * Hash password (in production, use bcrypt)
+ */
+async function hashPassword(password) {
+    // In a real application:
+    // return await bcrypt.hash(password, 12);
+    
+    // For simulation, return a "hashed" version
+    return `hashed_${password}_${Date.now()}`;
+}
+
+/**
+ * Generate a simulated wallet address
+ */
+async function generateWalletAddress() {
+    // In a real application, you might generate an actual wallet
+    // or use the user's connected wallet address
+    return `0x${Math.random().toString(16).substr(2, 40)}`;
+}
+
+/**
+ * Generate a simple JWT-like token (in production, use jsonwebtoken)
+ */
+function generateToken(userData) {
+    // In production, use:
+    // return jwt.sign(userData, process.env.JWT_SECRET, { expiresIn: '24h' });
+    
+    const tokenData = {
+        ...userData,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
+    };
+    
+    return Buffer.from(JSON.stringify(tokenData)).toString('base64');
+}
+
+/**
+ * Middleware to verify token
+ */
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access token required.' });
+    }
+
+    try {
+        // In production, use jwt.verify
+        const tokenData = JSON.parse(Buffer.from(token, 'base64').toString());
+        
+        // Check if token is expired
+        if (tokenData.exp < Math.floor(Date.now() / 1000)) {
+            return res.status(401).json({ error: 'Token expired.' });
+        }
+
+        req.user = tokenData;
+        next();
+    } catch (error) {
+        return res.status(403).json({ error: 'Invalid token.' });
+    }
+}
+
+/**
+ * Protected route example
+ */
+app.get('/auth/me', authenticateToken, async (req, res) => {
+    try {
+        const db = await dbPromise;
+        const user = await db.get(
+            'SELECT * FROM users WHERE id = ?',
+            [req.user.id]
+        );
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // Remove password from response
+        delete user.password;
+
+        res.json({ user });
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        res.status(500).json({ error: 'Failed to fetch user profile.' });
+    }
+});
