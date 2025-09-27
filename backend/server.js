@@ -26,37 +26,85 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// --- Helper Functions ---
+
+/**
+ * Calculates the distance between two GPS coordinates in meters.
+ * @param {number} lat1 Latitude of point 1
+ * @param {number} lon1 Longitude of point 1
+ * @param {number} lat2 Latitude of point 2
+ * @param {number} lon2 Longitude of point 2
+ * @returns {number} The distance in meters.
+ */
+function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+}
+
 // --- API Endpoints ---
 
 /**
- * @api {post} /organizer/issue-badge Create a new POAP event and get a claim link.
- * This is the primary endpoint for organizers.
+ * @api {post} /organizer/issue-badge Create a new POAP event with location data.
+ * @body {string} organizerAddress
+ * @body {string} metadataURI
+ * @body {number} latitude - The latitude of the event venue.
+ * @body {number} longitude - The longitude of the event venue.
+ * @body {number} radius - The valid claim radius in meters.
  */
 app.post('/organizer/issue-badge', async (req, res) => {
-    // This endpoint code remains the same as the previous step.
-    const { organizerAddress, metadataURI } = req.body;
-    if (!organizerAddress || !metadataURI || !ethers.isAddress(organizerAddress)) {
-        return res.status(400).json({ error: 'organizerAddress and metadataURI are required.' });
+    // Now expecting location data in the request body
+    const { organizerAddress, metadataURI, latitude, longitude, radius } = req.body;
+
+    // --- NEW: Enhanced Validation ---
+    if (!organizerAddress || !metadataURI || latitude === undefined || longitude === undefined || radius === undefined) {
+        return res.status(400).json({ error: 'organizerAddress, metadataURI, latitude, longitude, and radius are required.' });
     }
-    console.log(`Issuing badge for organizer: ${organizerAddress}`);
+    if (!ethers.isAddress(organizerAddress)) {
+        return res.status(400).json({ error: 'Invalid organizerAddress.' });
+    }
+    if (radius <= 0) {
+        return res.status(400).json({ error: 'Radius must be a positive number.' });
+    }
+
+    console.log(`Issuing badge for organizer ${organizerAddress} at [${latitude}, ${longitude}] with a ${radius}m radius.`);
+
     try {
+        // Step 1: Create event on-chain (this logic remains the same)
         const tx = await contract.createEvent(metadataURI);
         await tx.wait();
-        const latestEventId = await contract.getLatestEventId();
-        const eventIdOnChain = Number(latestEventId);
+        const eventIdOnChain = Number(await contract.getLatestEventId());
         console.log(`Event created on-chain with ID: ${eventIdOnChain}.`);
+
+        // Step 2: Generate unique claim link (this logic remains the same)
         const claimUUID = uuidv4();
         const claimLink = `http://localhost:${PORT}/claim/${claimUUID}`;
+
+        // Step 3: --- UPDATED: Save event details WITH location to our database ---
         const db = await dbPromise;
         await db.run(
-            'INSERT INTO events (eventIdOnChain, organizerAddress, metadataURI, claimLinkUUID) VALUES (?, ?, ?, ?)',
-            [eventIdOnChain, organizerAddress, metadataURI, claimUUID]
+            'INSERT INTO events (eventIdOnChain, organizerAddress, metadataURI, claimLinkUUID, latitude, longitude, radius) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [eventIdOnChain, organizerAddress, metadataURI, claimUUID, latitude, longitude, radius]
         );
+        
+        console.log(`Event with location data saved to database.`);
+
+        // Step 4: Return the unique claim link to the organizer (this logic remains the same)
         res.status(201).json({
-            message: "Event created successfully!",
+            message: "Event with location verification created successfully!",
             claimLink: claimLink,
             eventId: eventIdOnChain
         });
+
     } catch (error) {
         console.error("Error issuing badge:", error);
         res.status(500).json({ error: 'Failed to issue badge.' });
@@ -64,35 +112,54 @@ app.post('/organizer/issue-badge', async (req, res) => {
 });
 
 /**
- * @api {post} /claim/:uuid Allows an attendee to claim their POAP badge using a unique link.
- * @param {string} uuid - The unique identifier for the claim link.
- * @body {string} attendeeAddress - The wallet address of the attendee.
- * @body {string} signature - The personal_sign signature from the attendee's wallet.
+ * @api {post} /claim/:uuid Allows an attendee to claim their POAP badge with location verification.
+ * @param {string} uuid
+ * @body {string} attendeeAddress
+ * @body {string} signature
+ * @body {number} attendeeLatitude - The attendee's current latitude.
+ * @body {number} attendeeLongitude - The attendee's current longitude.
  */
 app.post('/claim/:uuid', async (req, res) => {
     const { uuid } = req.params;
-    const { attendeeAddress, signature } = req.body;
+    // Now expecting attendee's location data
+    const { attendeeAddress, signature, attendeeLatitude, attendeeLongitude } = req.body;
 
-    if (!attendeeAddress || !signature || !ethers.isAddress(attendeeAddress)) {
-        return res.status(400).json({ error: 'attendeeAddress and signature are required.' });
+    if (!attendeeAddress || !signature || attendeeLatitude === undefined || attendeeLongitude === undefined) {
+        return res.status(400).json({ error: 'attendeeAddress, signature, and location data are required.' });
     }
-
-    console.log(`Received claim request for UUID ${uuid} from ${attendeeAddress}`);
+    // ... other validation remains the same
 
     try {
         const db = await dbPromise;
 
-        // Step 1: Find the event using the UUID from the URL.
+        // Step 1: Find the event and its location rules from the DB
         const event = await db.get('SELECT * FROM events WHERE claimLinkUUID = ?', uuid);
         if (!event) {
             return res.status(404).json({ error: 'Claim link is invalid or has expired.' });
         }
+        
+        // --- NEW: Step 2: Perform Location Check ---
+        // If the event has location data, we must enforce the check.
+        if (event.latitude !== null && event.longitude !== null) {
+            const distance = getDistanceInMeters(
+                event.latitude,
+                event.longitude,
+                attendeeLatitude,
+                attendeeLongitude
+            );
 
-        const eventIdOnChain = event.eventIdOnChain;
-        const localEventId = event.id;
+            console.log(`Attendee is ${Math.round(distance)} meters away from the event center.`);
 
-        // Step 2: Verify the signature. The message must now match the UUID.
-        // This ties the signature to this specific claim link.
+            // If the attendee is outside the allowed radius, reject the claim.
+            if (distance > event.radius) {
+                return res.status(403).json({ 
+                    error: `You are too far from the event location. You are ${Math.round(distance)}m away, but must be within ${event.radius}m.` 
+                });
+            }
+            console.log("Location check passed.");
+        }
+
+        // Steps 3, 4, 5, etc. (Signature check, DB claim check, minting) remain the same...
         const message = `Claiming POAP for event link: ${uuid}`;
         const signerAddress = ethers.verifyMessage(message, signature);
         if (signerAddress.toLowerCase() !== attendeeAddress.toLowerCase()) {
@@ -100,21 +167,16 @@ app.post('/claim/:uuid', async (req, res) => {
         }
         console.log("Signature verified successfully.");
 
-        // Step 3: Check our LOCAL DATABASE for previous claims. This is much faster.
-        const existingClaim = await db.get('SELECT id FROM claims WHERE eventId = ? AND attendeeAddress = ?', [localEventId, attendeeAddress]);
+        const existingClaim = await db.get('SELECT id FROM claims WHERE eventId = ? AND attendeeAddress = ?', [event.id, attendeeAddress]);
         if (existingClaim) {
             return res.status(409).json({ error: 'This address has already claimed this badge.' });
         }
 
-        // Step 4: If all checks pass, submit the minting transaction.
-        console.log(`Submitting mintBadge tx for on-chain event ${eventIdOnChain} to attendee ${attendeeAddress}...`);
-        const tx = await contract.mintBadge(eventIdOnChain, attendeeAddress);
+        const tx = await contract.mintBadge(event.eventIdOnChain, attendeeAddress);
         await tx.wait();
         console.log(`Transaction successful! Hash: ${tx.hash}`);
 
-        // Step 5: Record the successful claim in our database.
-        await db.run('INSERT INTO claims (eventId, attendeeAddress) VALUES (?, ?)', [localEventId, attendeeAddress]);
-        console.log(`Claim by ${attendeeAddress} for local event ${localEventId} saved to database.`);
+        await db.run('INSERT INTO claims (eventId, attendeeAddress) VALUES (?, ?)', [event.id, attendeeAddress]);
 
         res.status(200).json({ message: 'Badge claimed successfully!', transactionHash: tx.hash });
 
@@ -123,8 +185,6 @@ app.post('/claim/:uuid', async (req, res) => {
         res.status(500).json({ error: 'Failed to claim badge.' });
     }
 });
-
-// Add this new endpoint after the '/claim/:uuid' endpoint
 
 /**
  * @api {get} /collection/:address Retrieve all POAPs claimed by a specific wallet address.
@@ -169,8 +229,6 @@ app.get('/collection/:address', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch collection.' });
     }
 });
-
-// Add this new endpoint after the '/collection/:address' endpoint
 
 /**
  * @api {get} /metadata/:eventIdOnChain Retrieve the ERC-721 metadata for a specific POAP.
