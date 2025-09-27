@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const { ethers, JsonRpcProvider } = require('ethers');
 const { v4: uuidv4 } = require('uuid'); // To generate unique claim IDs
+const { create } = require('ipfs-http-client'); // IPFS client
+const multer = require('multer'); // Middleware for handling file uploads
 require('dotenv').config();
 
 const dbPromise = require('./db/database.js'); // Our database setup
@@ -19,6 +21,10 @@ if (!contractAddress || !ethers.isAddress(contractAddress)) {
 const contract = new ethers.Contract(contractAddress, contractABI, relayerWallet);
 console.log(`Connected to contract at: ${contract.target}`);
 console.log(`Relayer Wallet Address: ${relayerWallet.address}`);
+
+// --- IPFS & Multer Setup ---
+const ipfs = create({ url: process.env.IPFS_API_URL });
+const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory buffer
 
 // --- Express App Setup ---
 const app = express();
@@ -54,62 +60,78 @@ function getDistanceInMeters(lat1, lon1, lat2, lon2) {
 // --- API Endpoints ---
 
 /**
- * @api {post} /organizer/issue-badge Create a new POAP event with location data.
- * @body {string} organizerAddress
- * @body {string} metadataURI
- * @body {number} latitude - The latitude of the event venue.
- * @body {number} longitude - The longitude of the event venue.
- * @body {number} radius - The valid claim radius in meters.
+ * @api {post} /organizer/issue-badge (multipart/form-data)
+ * Now accepts form-data with an image file.
+ * @field {File} badgeImage - The image file for the NFT badge.
+ * @field {string} organizerAddress
+ * @field {string} eventName
+ * @field {string} eventDescription
+ * @field {number} latitude
+ * @field {number} longitude
+ * @field {number} radius
  */
-app.post('/organizer/issue-badge', async (req, res) => {
-    // Now expecting location data in the request body
-    const { organizerAddress, metadataURI, latitude, longitude, radius } = req.body;
+app.post('/organizer/issue-badge', upload.single('badgeImage'), async (req, res) => {
+    const { organizerAddress, eventName, eventDescription, latitude, longitude, radius } = req.body;
+    
+    // Check for the uploaded file
+    if (!req.file) {
+        return res.status(400).json({ error: 'badgeImage file is required.' });
+    }
+    // ... (add validation for other fields as before)
 
-    // --- NEW: Enhanced Validation ---
-    if (!organizerAddress || !metadataURI || latitude === undefined || longitude === undefined || radius === undefined) {
-        return res.status(400).json({ error: 'organizerAddress, metadataURI, latitude, longitude, and radius are required.' });
-    }
-    if (!ethers.isAddress(organizerAddress)) {
-        return res.status(400).json({ error: 'Invalid organizerAddress.' });
-    }
-    if (radius <= 0) {
-        return res.status(400).json({ error: 'Radius must be a positive number.' });
-    }
-
-    console.log(`Issuing badge for organizer ${organizerAddress} at [${latitude}, ${longitude}] with a ${radius}m radius.`);
+    console.log(`Received new badge request from ${organizerAddress} for event "${eventName}"`);
 
     try {
-        // Step 1: Create event on-chain (this logic remains the same)
+        // Step 1: Upload the image file to IPFS
+        console.log("Uploading image to IPFS...");
+        const imageUploadResult = await ipfs.add(req.file.buffer);
+        const imageCID = imageUploadResult.cid.toString();
+        console.log(`Image uploaded to IPFS. CID: ${imageCID}`);
+
+        // Step 2: Construct the JSON metadata
+        const metadata = {
+            name: eventName,
+            description: eventDescription,
+            image: `ipfs://${imageCID}`, // The crucial link to the image
+            attributes: [
+                { "trait_type": "Organizer", "value": organizerAddress },
+                { "trait_type": "Location", "value": `${latitude}, ${longitude}` }
+            ]
+        };
+
+        // Step 3: Upload the JSON metadata to IPFS
+        console.log("Uploading metadata JSON to IPFS...");
+        const metadataUploadResult = await ipfs.add(JSON.stringify(metadata));
+        const metadataCID = metadataUploadResult.cid.toString();
+        const metadataURI = `ipfs://${metadataCID}`;
+        console.log(`Metadata uploaded to IPFS. URI: ${metadataURI}`);
+
+        // Step 4: Call the smart contract with the new, real metadataURI
         const tx = await contract.createEvent(metadataURI);
         await tx.wait();
         const eventIdOnChain = Number(await contract.getLatestEventId());
-        console.log(`Event created on-chain with ID: ${eventIdOnChain}.`);
-
-        // Step 2: Generate unique claim link (this logic remains the same)
+        
+        // Step 5: Save to DB and respond (logic is the same as before)
         const claimUUID = uuidv4();
         const claimLink = `http://localhost:${PORT}/claim/${claimUUID}`;
-
-        // Step 3: --- UPDATED: Save event details WITH location to our database ---
         const db = await dbPromise;
         await db.run(
             'INSERT INTO events (eventIdOnChain, organizerAddress, metadataURI, claimLinkUUID, latitude, longitude, radius) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [eventIdOnChain, organizerAddress, metadataURI, claimUUID, latitude, longitude, radius]
         );
         
-        console.log(`Event with location data saved to database.`);
-
-        // Step 4: Return the unique claim link to the organizer (this logic remains the same)
         res.status(201).json({
-            message: "Event with location verification created successfully!",
+            message: "Event created and assets uploaded to IPFS successfully!",
             claimLink: claimLink,
-            eventId: eventIdOnChain
+            metadataURI: metadataURI
         });
 
     } catch (error) {
-        console.error("Error issuing badge:", error);
+        console.error("Error issuing badge with IPFS:", error);
         res.status(500).json({ error: 'Failed to issue badge.' });
     }
 });
+
 
 /**
  * @api {post} /claim/:uuid Allows an attendee to claim their POAP badge with location verification.
@@ -231,56 +253,35 @@ app.get('/collection/:address', async (req, res) => {
 });
 
 /**
- * @api {get} /metadata/:eventIdOnChain Retrieve the ERC-721 metadata for a specific POAP.
- * @param {number} eventIdOnChain - The on-chain ID of the event.
+ * @api {get} /metadata/:eventIdOnChain (Now reads from IPFS)
  */
 app.get('/metadata/:eventIdOnChain', async (req, res) => {
     const { eventIdOnChain } = req.params;
-    const eventId = parseInt(eventIdOnChain);
-
-    if (isNaN(eventId) || eventId <= 0) {
-        return res.status(400).json({ error: 'A valid on-chain event ID is required.' });
-    }
-
-    console.log(`Fetching metadata for on-chain event ID: ${eventId}`);
-
     try {
         const db = await dbPromise;
-
-        // Find the event in our database using its on-chain ID
-        const event = await db.get('SELECT * FROM events WHERE eventIdOnChain = ?', eventId);
-
+        const event = await db.get('SELECT metadataURI FROM events WHERE eventIdOnChain = ?', eventIdOnChain);
         if (!event) {
-            return res.status(404).json({ error: 'Metadata for the specified event not found.' });
+            return res.status(404).json({ error: 'Event not found.' });
         }
 
-        // --- IPFS Data Fetching Simulation ---
-        // In a real-world application, you would use an IPFS client (like ipfs-http-client)
-        // to fetch the content from event.metadataURI.
-        // For this test, we will simulate it by returning a structured JSON object.
-        // We can imagine the metadataURI contains the data for "Crypto Dev Meetup".
+        // Step 1: Get the IPFS URI from our database
+        const metadataURI = event.metadataURI;
+        const cid = metadataURI.replace('ipfs://', '');
+        console.log(`Fetching metadata from IPFS for CID: ${cid}`);
         
-        const metadata = {
-            name: `Crypto Dev Meetup #${event.eventIdOnChain}`,
-            description: "A digital souvenir commemorating attendance at the Crypto Dev Meetup. This badge proves you were there!",
-            image: "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi/chainlink-logo.png", // Using a real, public IPFS image link for a good example
-            attributes: [
-                {
-                    "trait_type": "Event Date",
-                    "value": new Date(event.createdAt).toLocaleDateString()
-                },
-                {
-                    "trait_type": "Organizer",
-                    "value": event.organizerAddress
-                }
-            ]
-        };
-
-        console.log(`Serving metadata for event ${eventId}`);
+        // Step 2: Use the IPFS client to fetch the file content
+        let content = [];
+        for await (const chunk of ipfs.cat(cid)) {
+            content.push(chunk);
+        }
+        
+        // Step 3: Decode the content and parse it as JSON
+        const metadata = JSON.parse(Buffer.concat(content).toString());
+        
         res.status(200).json(metadata);
 
     } catch (error) {
-        console.error(`Error fetching metadata for event ${eventId}:`, error);
+        console.error("Error fetching metadata from IPFS:", error);
         res.status(500).json({ error: 'Failed to fetch metadata.' });
     }
 });

@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS events (
     organizerAddress TEXT NOT NULL,
     metadataURI TEXT NOT NULL,
     claimLinkUUID TEXT NOT NULL UNIQUE,
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    longitude REAL NOT NULL,
+    latitude REAL NOT NULL,
+    radius INTEGER NOT NULL
 );
 
 -- The 'claims' table tracks who has claimed a badge for which event.
