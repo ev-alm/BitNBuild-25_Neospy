@@ -1,4 +1,4 @@
-// contracts/scripts/verify_deployment.js
+// contracts/scripts/verify_deployment.js (Updated for Base URI)
 const hre = require("hardhat");
 
 async function main() {
@@ -8,10 +8,16 @@ async function main() {
   const [admin, relayer] = await hre.ethers.getSigners();
   console.log(`Deployer (Admin) address: ${admin.address}`);
 
-  // 2. Deploy the contract
+  // --- NEW: Define the base URI that the constructor now requires ---
+  const baseTokenURI = "http://localhost:3001/metadata/";
+  console.log(`Using Metadata Base URI: ${baseTokenURI}`);
+
+
+  // 2. Deploy the contract with all three required arguments
   console.log("Deploying contract...");
   const ProofOfPresence = await hre.ethers.getContractFactory("ProofOfPresence");
-  const contract = await ProofOfPresence.deploy(admin.address, relayer.address);
+  // --- UPDATED: Pass the baseTokenURI as the third argument ---
+  const contract = await ProofOfPresence.deploy(admin.address, relayer.address, baseTokenURI);
   await contract.waitForDeployment();
   const contractAddress = contract.target;
   console.log(`Contract deployed to: ${contractAddress}`);
