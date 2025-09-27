@@ -26,6 +26,25 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// --- Location Data ---
+const EVENT_LOCATION = {
+    latitude: 48.8584, // Eiffel Tower Lat
+    longitude: 2.2945, // Eiffel Tower Lon
+    radius: 200 // 200 meter radius
+};
+
+// A location within the 200m radius
+const ATTENDEE_LOCATION_VALID = {
+    latitude: 48.8580,
+    longitude: 2.2946
+};
+
+// A location far outside the 200m radius
+const ATTENDEE_LOCATION_INVALID = {
+    latitude: 48.8628, // Approx 500m away
+    longitude: 2.2872
+};
+
 // --- Helper Functions ---
 
 /**

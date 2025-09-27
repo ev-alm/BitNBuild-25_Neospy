@@ -1,165 +1,249 @@
+
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Proof of Presence - API Tester</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-        .container { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
-        h2 { border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        button { padding: 10px 15px; font-size: 16px; cursor: pointer; }
-        code { background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
-        pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; }
-        input { width: 95%; padding: 8px; margin-bottom: 10px; }
-        .hidden { display: none; }
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+        max-width: 800px;
+        margin: auto;
+      }
+      .container {
+        border: 1px solid #ccc;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+      }
+      h2 {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+      }
+      button {
+        padding: 10px 15px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      code {
+        background-color: #f4f4f4;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      pre {
+        background-color: #f4f4f4;
+        padding: 10px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      input {
+        width: 95%;
+        padding: 8px;
+        margin-bottom: 10px;
+      }
+      .hidden {
+        display: none;
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <h1>Proof of Presence - API Tester</h1>
-    <p><strong>Instructions:</strong> Open your browser's developer console (F12) to see detailed logs. You must have the MetaMask extension installed.</p>
+    <p>
+      <strong>Instructions:</strong> Open your browser's developer console (F12)
+      to see detailed logs. You must have the MetaMask extension installed.
+    </p>
 
     <!-- Wallet Connection -->
     <div class="container">
-        <h2>1. Connect Wallet</h2>
-        <!-- FIX: Added type="button" -->
-        <button id="connectButton" type="button">Connect MetaMask</button>
-        <p><strong>Status:</strong> <span id="walletStatus">Not Connected</span></p>
-        <p><strong>Wallet Address:</strong> <code id="walletAddress">N/A</code></p>
+      <h2>1. Connect Wallet</h2>
+      <!-- FIX: Added type="button" -->
+      <button id="connectButton" type="button">Connect MetaMask</button>
+      <p>
+        <strong>Status:</strong> <span id="walletStatus">Not Connected</span>
+      </p>
+      <p>
+        <strong>Wallet Address:</strong> <code id="walletAddress">N/A</code>
+      </p>
     </div>
 
     <!-- Organizer Flow -->
     <div id="organizerSection" class="container hidden">
-        <h2>2. Organizer: Issue a Badge</h2>
-        <p>This will create a new POAP event and generate a unique claim link.</p>
-        <!-- FIX: Added type="button" -->
-        <button id="issueBadgeButton" type="button">Issue New Badge</button>
-        <p><strong>Claim Link:</strong> <code id="claimLink">N/A</code></p>
+      <h2>2. Organizer: Issue a Badge</h2>
+      <p>This will create a new POAP event and generate a unique claim link.</p>
+      <!-- FIX: Added type="button" -->
+      <button id="issueBadgeButton" type="button">Issue New Badge</button>
+      <p><strong>Claim Link:</strong> <code id="claimLink">N/A</code></p>
     </div>
 
     <!-- Attendee Flow -->
     <div id="attendeeSection" class="container hidden">
-        <h2>3. Attendee: Claim a Badge</h2>
-        <p>Paste the Claim Link from Step 2 and click claim. You will be asked to sign a message (this is free).</p>
-        <input type="text" id="claimLinkInput" placeholder="Paste Claim Link Here">
-        <!-- FIX: Added type="button" -->
-        <button id="claimBadgeButton" type="button">Claim My Badge</button>
+      <h2>3. Attendee: Claim a Badge</h2>
+      <p>
+        Paste the Claim Link from Step 2 and click claim. You will be asked to
+        sign a message (this is free).
+      </p>
+      <input
+        type="text"
+        id="claimLinkInput"
+        placeholder="Paste Claim Link Here"
+      />
+      <!-- FIX: Added type="button" -->
+      <button id="claimBadgeButton" type="button">Claim My Badge</button>
     </div>
-    
+
     <!-- Results -->
     <div class="container">
-        <h2>API Results</h2>
-        <pre id="results">Results will be displayed here...</pre>
+      <h2>API Results</h2>
+      <pre id="results">Results will be displayed here...</pre>
     </div>
 
     <script>
-        // The JavaScript code remains exactly the same.
-        const connectButton = document.getElementById('connectButton');
-        const issueBadgeButton = document.getElementById('issueBadgeButton');
-        const claimBadgeButton = document.getElementById('claimBadgeButton');
-        
-        const walletStatus = document.getElementById('walletStatus');
-        const walletAddressEl = document.getElementById('walletAddress');
-        const claimLinkEl = document.getElementById('claimLink');
-        const claimLinkInput = document.getElementById('claimLinkInput');
-        const resultsEl = document.getElementById('results');
+      // The JavaScript code remains exactly the same.
+      const connectButton = document.getElementById("connectButton");
+      const issueBadgeButton = document.getElementById("issueBadgeButton");
+      const claimBadgeButton = document.getElementById("claimBadgeButton");
 
-        const organizerSection = document.getElementById('organizerSection');
-        const attendeeSection = document.getElementById('attendeeSection');
+      const walletStatus = document.getElementById("walletStatus");
+      const walletAddressEl = document.getElementById("walletAddress");
+      const claimLinkEl = document.getElementById("claimLink");
+      const claimLinkInput = document.getElementById("claimLinkInput");
+      const resultsEl = document.getElementById("results");
 
-        const BACKEND_URL = 'http://localhost:3001';
-        let connectedAccount = null;
+      const organizerSection = document.getElementById("organizerSection");
+      const attendeeSection = document.getElementById("attendeeSection");
 
-        if (typeof window.ethereum === 'undefined') {
-            alert('MetaMask is not installed! Please install it to use this tester.');
-            connectButton.disabled = true;
+      const BACKEND_URL = "http://localhost:3001";
+      let connectedAccount = null;
+
+      // --- Location Data ---
+      const EVENT_LOCATION = {
+        latitude: 48.8584, // Eiffel Tower Lat
+        longitude: 2.2945, // Eiffel Tower Lon
+        radius: 200, // 200 meter radius
+      };
+
+      // A location within the 200m radius
+      const ATTENDEE_LOCATION_VALID = {
+        latitude: 48.858,
+        longitude: 2.2946,
+      };
+
+      // A location far outside the 200m radius
+      const ATTENDEE_LOCATION_INVALID = {
+        latitude: 48.8628, // Approx 500m away
+        longitude: 2.2872,
+      };
+
+      if (typeof window.ethereum === "undefined") {
+        alert(
+          "MetaMask is not installed! Please install it to use this tester."
+        );
+        connectButton.disabled = true;
+      }
+
+      connectButton.addEventListener("click", async () => {
+        try {
+          const accounts = await window.ethereum.request({
+            method: "eth_requestAccounts",
+          });
+          connectedAccount = accounts[0];
+          walletStatus.textContent = "Connected";
+          walletAddressEl.textContent = connectedAccount;
+          organizerSection.classList.remove("hidden");
+          attendeeSection.classList.remove("hidden");
+          logResult("Wallet connected successfully!");
+        } catch (error) {
+          logError("Failed to connect wallet.", error);
         }
+      });
 
-        connectButton.addEventListener('click', async () => {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                connectedAccount = accounts[0];
-                walletStatus.textContent = 'Connected';
-                walletAddressEl.textContent = connectedAccount;
-                organizerSection.classList.remove('hidden');
-                attendeeSection.classList.remove('hidden');
-                logResult('Wallet connected successfully!');
-            } catch (error) {
-                logError('Failed to connect wallet.', error);
-            }
-        });
-
-        issueBadgeButton.addEventListener('click', async () => {
-            if (!connectedAccount) {
-                alert('Please connect your wallet first.');
-                return;
-            }
-            logResult('Sending request to /organizer/issue-badge...');
-            try {
-                const response = await fetch(`${BACKEND_URL}/organizer/issue-badge`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        organizerAddress: connectedAccount,
-                        metadataURI: `ipfs://html-tester-event-${Date.now()}`
-                    })
-                });
-                const data = await response.json();
-                if (!response.ok) throw data;
-
-                claimLinkEl.textContent = data.claimLink;
-                claimLinkInput.value = data.claimLink;
-                logResult('Successfully issued badge!', data);
-            } catch (error) {
-                logError('Failed to issue badge.', error);
-            }
-        });
-
-        claimBadgeButton.addEventListener('click', async () => {
-            if (!connectedAccount) {
-                alert('Please connect your wallet first.');
-                return;
-            }
-            const link = claimLinkInput.value;
-            if (!link) {
-                alert('Please provide a claim link.');
-                return;
-            }
-            const uuid = link.split('/').pop();
-            const message = `Claiming POAP for event link: ${uuid}`;
-            try {
-                logResult(`Asking wallet to sign message: "${message}"`);
-                const signature = await window.ethereum.request({
-                    method: 'personal_sign',
-                    params: [message, connectedAccount],
-                });
-                logResult('Signature received!', { signature });
-                logResult(`Sending request to ${link}...`);
-                const response = await fetch(link, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        attendeeAddress: connectedAccount,
-                        signature: signature
-                    })
-                });
-                const data = await response.json();
-                if (!response.ok) throw data;
-                logResult('Badge claimed successfully!', data);
-            } catch (error) {
-                logError('Failed to claim badge.', error);
-            }
-        });
-
-        function logResult(message, data = '') {
-            console.log(message, data);
-            resultsEl.textContent = `SUCCESS: ${message}\n\n${JSON.stringify(data, null, 2)}`;
+      issueBadgeButton.addEventListener("click", async () => {
+        if (!connectedAccount) {
+          alert("Please connect your wallet first.");
+          return;
         }
-        function logError(message, error = '') {
-            console.error(message, error);
-            resultsEl.textContent = `ERROR: ${message}\n\n${JSON.stringify(error, null, 2)}`;
+        logResult("Sending request to /organizer/issue-badge...");
+        try {
+          const response = await fetch(`${BACKEND_URL}/organizer/issue-badge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              organizerAddress: connectedAccount,
+              metadataURI: `ipfs://html-tester-event-${Date.now()}`,
+              latitude: EVENT_LOCATION.latitude,
+              longitude: EVENT_LOCATION.longitude,
+              radius: EVENT_LOCATION.radius,
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw data;
+
+          claimLinkEl.textContent = data.claimLink;
+          claimLinkInput.value = data.claimLink;
+          logResult("Successfully issued badge!", data);
+        } catch (error) {
+          logError("Failed to issue badge.", error);
         }
+      });
+
+      claimBadgeButton.addEventListener("click", async () => {
+        if (!connectedAccount) {
+          alert("Please connect your wallet first.");
+          return;
+        }
+        const link = claimLinkInput.value;
+        if (!link) {
+          alert("Please provide a claim link.");
+          return;
+        }
+        const uuid = link.split("/").pop();
+        const message = `Claiming POAP for event link: ${uuid}`;
+        try {
+          logResult(`Asking wallet to sign message: "${message}"`);
+          const signature = await window.ethereum.request({
+            method: "personal_sign",
+            params: [message, connectedAccount],
+          });
+          logResult("Signature received!", { signature });
+          logResult(`Sending request to ${link}...`);
+          const response = await fetch(link, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              attendeeAddress: connectedAccount,
+              signature: signature,
+              attendeeLatitude: ATTENDEE_LOCATION_VALID.latitude,
+              attendeeLongitude: ATTENDEE_LOCATION_VALID.longitude
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw data;
+          logResult("Badge claimed successfully!", data);
+        } catch (error) {
+          logError("Failed to claim badge.", error);
+        }
+      });
+
+      function logResult(message, data = "") {
+        console.log(message, data);
+        resultsEl.textContent = `SUCCESS: ${message}\n\n${JSON.stringify(
+          data,
+          null,
+          2
+        )}`;
+      }
+      function logError(message, error = "") {
+        console.error(message, error);
+        resultsEl.textContent = `ERROR: ${message}\n\n${JSON.stringify(
+          error,
+          null,
+          2
+        )}`;
+      }
     </script>
-</body>
+  </body>
 </html>
+
