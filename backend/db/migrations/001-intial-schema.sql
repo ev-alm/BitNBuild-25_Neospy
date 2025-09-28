@@ -10,7 +10,14 @@ CREATE TABLE IF NOT EXISTS events (
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     longitude REAL NOT NULL,
     latitude REAL NOT NULL,
-    radius INTEGER NOT NULL
+    radius INTEGER NOT NULL,
+    event_type TEXT NOT NULL DEFAULT 'offline',
+    event_status TEXT NOT NULL DEFAULT 'active',
+    issues_badge BOOLEAN NOT NULL DEFAULT 1,
+    estimated_attendees INTEGER,
+    event_start_datetime TEXT,
+    event_end_datetime TEXT,
+    claim_expiry_minutes INTEGER NOT NULL DEFAULT 30
 );
 
 -- The 'claims' table tracks who has claimed a badge for which event.
@@ -22,6 +29,18 @@ CREATE TABLE IF NOT EXISTS claims (
     claimedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(eventId) REFERENCES events(id),
     UNIQUE(eventId, attendeeAddress)
+);
+
+-- Create a new table to track "credential" claims for non-badge events.
+-- This is the off-chain equivalent of the on-chain 'claims' table.
+CREATE TABLE IF NOT EXISTS attendance_creds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    claimed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(event_id) REFERENCES events(id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    UNIQUE(event_id, user_id)
 );
 
 -- Table to store organization profiles and login credentials
