@@ -33,6 +33,12 @@ const contract = new ethers.Contract(
 console.log(`Connected to contract at: ${contract.target}`);
 console.log(`Relayer Wallet Address: ${relayerWallet.address}`);
 
+// --- Claim Realy ---
+const transactionQueue = [];
+let isProcessingQueue = false;
+const pendingClaims = new Set();
+let relayerNonce = -1;
+
 // --- IPFS & Multer Setup ---
 const ipfs = create({ url: process.env.IPFS_API_URL });
 const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory buffer
@@ -66,6 +72,113 @@ function getDistanceInMeters(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // Distance in meters
+}
+
+/**
+ * A synchronized gatekeeper for all relayer transactions.
+ * It manages the nonce centrally to prevent all race conditions.
+ * @param {Function} transactionFunction A function that returns a transaction promise, e.g., () => contract.createEvent(...)
+ */
+async function sendRelayerTransaction(transactionFunction) {
+  // This function is "atomic" - it completes fully before another can start.
+  const nonceToSend = relayerNonce;
+  console.log(`[Transaction Sender] Using nonce ${nonceToSend}`);
+
+  // Increment the global nonce immediately so the next call gets the next number.
+  relayerNonce++;
+
+  const freshRelayerWallet = new ethers.Wallet(
+    process.env.RELAYER_PRIVATE_KEY,
+    provider
+  );
+
+  // Execute the specific transaction (e.g., createEvent or mintBadge) with the correct nonce
+  const tx = await transactionFunction(freshRelayerWallet, nonceToSend);
+
+  console.log(
+    `[Transaction Sender] Tx with nonce ${nonceToSend} submitted. Hash: ${tx.hash}`
+  );
+  return tx;
+}
+
+async function processTransactionQueue() {
+    if (isProcessingQueue || transactionQueue.length === 0) return;
+
+    isProcessingQueue = true;
+    const job = transactionQueue.shift();
+
+    try {
+        console.log(`[Queue Worker] Processing job for claim ID "${job.uniqueClaimId}"...`);
+        const { event, userId, userWalletAddress } = job;
+        const db = await dbPromise;
+
+        if (event.issues_badge) {
+            const existingClaim = await db.get('SELECT id FROM claims WHERE eventId = ? AND attendeeAddress = ?', [event.id, userWalletAddress]);
+            if (existingClaim) throw new Error(`Duplicate badge claim detected.`);
+
+            // Use our new gatekeeper function
+            const tx = await sendRelayerTransaction(
+                (signer, nonce) => contract.connect(signer).mintBadge(event.eventIdOnChain, userWalletAddress, { nonce: nonce })
+            );
+            const receipt = await tx.wait(); // Wait for the transaction to be mined
+
+            console.log(`[Queue Worker] Tx for user ${userId} confirmed! Hash: ${tx.hash}`);
+
+            // --- CORRECT WAY TO GET TOKEN ID ---
+            let tokenId = null;
+            if (receipt && receipt.logs) {
+                // Find the Transfer event
+                const transferEvent = receipt.logs.find(log => {
+                    try {
+                        // Attempt to parse the log with the contract's interface
+                        const parsed = contract.interface.parseLog(log);
+                        return parsed && parsed.name === 'Transfer' && parsed.args.from === ethers.ZeroAddress;
+                    } catch (e) {
+                        // console.warn("Could not parse log, likely not a Transfer event from this contract:", e.message);
+                        return false;
+                    }
+                });
+
+                if (transferEvent) {
+                    const parsed = contract.interface.parseLog(transferEvent);
+                    tokenId = Number(parsed.args.tokenId);
+                    console.log(`[Queue Worker] Minted tokenId: ${tokenId}`);
+                } else {
+                    console.warn(`[Queue Worker] No 'Transfer' event found in receipt for tx ${tx.hash}. Cannot determine tokenId precisely.`);
+                    // Fallback to getLatestTokenId, but this is less reliable
+                    tokenId = Number(await contract.getLatestTokenId()); 
+                    console.warn(`[Queue Worker] Falling back to getLatestTokenId, which is ${tokenId}.`);
+                }
+            } else {
+                console.warn(`[Queue Worker] No receipt or logs found for tx ${tx.hash}. Falling back to getLatestTokenId.`);
+                tokenId = Number(await contract.getLatestTokenId());
+                console.warn(`[Queue Worker] Falling back to getLatestTokenId, which is ${tokenId}.`);
+            }
+
+            if (tokenId === null) {
+                throw new Error("Failed to determine minted tokenId.");
+            }
+
+            await db.run(
+                'INSERT INTO claims (eventId, attendeeAddress, transaction_hash, token_id) VALUES (?, ?, ?, ?)',
+                [event.id, userWalletAddress, tx.hash, tokenId] // Use the correctly retrieved tokenId
+            );
+        } else { // Off-chain credential
+            await db.run('INSERT INTO attendance_creds (event_id, user_id) VALUES (?, ?)', [event.id, userId]);
+            console.log(`[Queue Worker] Off-chain cred for user ${userId} recorded.`);
+        }
+    } catch (error) {
+        console.error(`[Queue Worker] FATAL ERROR processing claim ID "${job.uniqueClaimId}":`, error.shortMessage || error.message);
+    } finally {
+        pendingClaims.delete(job.uniqueClaimId);
+        isProcessingQueue = false;
+        // Ensure that nextTick is called only if there are more items in the queue
+        if (transactionQueue.length > 0) {
+            process.nextTick(processTransactionQueue);
+        } else {
+            console.log(`[Queue Worker] Finished processing claim ID "${job.uniqueClaimId}". Lock released. Queue empty.`);
+        }
+    }
 }
 
 // --- Middleware for Protecting Routes ---
@@ -127,42 +240,35 @@ app.post(
     const issues_badge_bool = issuesBadge === "true";
     const is_online_bool = isOnline === "true";
     const organizationId = req.organization.orgId;
-
-    // --- Validation ---
-    if (!eventStart || !eventEnd) {
-      return res
-        .status(400)
-        .json({ error: "Event start and end times are required." });
-    }
-    if (
-      isNaN(startDate.getTime()) ||
-      isNaN(endDate.getTime()) ||
-      startDate >= endDate
-    ) {
-      return res.status(400).json({
-        error: "Invalid event dates. Start date must be before end date.",
-      });
-    }
-    if (!eventName)
-      return res.status(400).json({ error: "Event name is required." });
-    if (!is_online_bool && (!latitude || !longitude || !radius)) {
-      return res
-        .status(400)
-        .json({ error: "Location data is required for offline events." });
-    }
-    if (issues_badge_bool && !req.file) {
-      return res
-        .status(400)
-        .json({ error: "A badge image is required when issuing badges." });
-    }
+    let startDate, endDate;
 
     try {
+      // --- Validation ---
+      if (!eventStart || !eventEnd)
+        return res
+          .status(400)
+          .json({ error: "Event start and end times are required." });
+      startDate = new Date(eventStart);
+      endDate = new Date(eventEnd);
+      if (
+        isNaN(startDate.getTime()) ||
+        isNaN(endDate.getTime()) ||
+        startDate >= endDate
+      )
+        return res.status(400).json({ error: "Invalid event dates." });
+      if (!eventName)
+        return res.status(400).json({ error: "Event name is required." });
+      if (!is_online_bool && (!latitude || !longitude || !radius))
+        return res
+          .status(400)
+          .json({ error: "Location data is required for offline events." });
+      if (issues_badge_bool && !req.file)
+        return res.status(400).json({ error: "A badge image is required." });
+
+      // --- IPFS and On-Chain Logic ---
       let metadataURI = null;
       let eventIdOnChain = null;
-
-      // --- Badge Issuing Logic (On-Chain Interaction) ---
       if (issues_badge_bool) {
-        console.log(`Uploading assets to IPFS for NFT badge...`);
         const imageUploadResult = await ipfs.add(req.file.buffer);
         const metadata = {
           name: eventName,
@@ -171,26 +277,28 @@ app.post(
         };
         const metadataUploadResult = await ipfs.add(JSON.stringify(metadata));
         metadataURI = `ipfs://${metadataUploadResult.cid.toString()}`;
-
         console.log(`Creating event on-chain with metadata: ${metadataURI}`);
-        const tx = await contract.createEvent(metadataURI);
+        // Use our new gatekeeper function
+        const tx = await sendRelayerTransaction((signer, nonce) =>
+          contract.connect(signer).createEvent(metadataURI, { nonce: nonce })
+        );
         await tx.wait();
         eventIdOnChain = Number(await contract.getLatestEventId());
       }
 
       // --- Database Insertion ---
-      const startDate = new Date(eventStart);
-      const endDate = new Date(eventEnd);
       const claimUUID = uuidv4();
       const claimLink = `http://localhost:${PORT}/claim/${claimUUID}`;
       const db = await dbPromise;
 
+      // THIS IS THE CORRECTED INSERT STATEMENT
       await db.run(
         `INSERT INTO events (
                 eventIdOnChain, organizerAddress, metadataURI, claimLinkUUID, latitude, longitude, radius,
-                event_type, issues_badge, estimated_attendees, status,
-                event_start_datetime, event_end_datetime, claim_expiry_minutes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                event_type, issues_badge, estimated_attendees, event_status,
+                event_start_datetime, event_end_datetime, claim_expiry_minutes,
+                eventName, eventDescription
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           eventIdOnChain,
           organizationId,
@@ -200,21 +308,20 @@ app.post(
           is_online_bool ? null : longitude,
           is_online_bool ? null : radius,
           is_online_bool ? "online" : "offline",
-          issues_badge_bool,
+          issues_badge_bool ? 1 : 0,
           estimatedAttendees || null,
           "active",
           startDate.toISOString(),
           endDate.toISOString(),
           claimExpiryMinutes || 60,
+          eventName,
+          eventDescription || null,
         ]
       );
 
-      console.log(`Event (ID: ${result.lastID}) created in database.`);
-      res.status(201).json({
-        message: "Event created successfully!",
-        claimLink: claimLink,
-        issuesBadge: issues_badge_bool,
-      });
+      res
+        .status(201)
+        .json({ message: "Event created successfully!", claimLink });
     } catch (error) {
       console.error("Error issuing badge/cred:", error);
       res.status(500).json({ error: "Failed to create event." });
@@ -226,10 +333,9 @@ app.post(
  * @api {post} /claim/:uuid Smart claim endpoint for both Badges (NFTs) and Credentials (off-chain).
  */
 app.post("/claim/:uuid", authenticateUser, async (req, res) => {
-  // Now a protected route
   const { uuid } = req.params;
   const { attendeeLatitude, attendeeLongitude } = req.body;
-  const userId = req.user.userId; // User must be logged in to claim
+  const userId = req.user.userId;
   const userWalletAddress = req.user.walletAddress;
 
   try {
@@ -239,90 +345,85 @@ app.post("/claim/:uuid", authenticateUser, async (req, res) => {
       uuid
     );
 
+    // --- All Pre-Queue Validations Happen Here ---
     if (!event)
       return res.status(404).json({ error: "Claim link is invalid." });
-
-    if (event.status !== "active") {
+    if (event.event_status !== "active")
       return res
         .status(403)
         .json({ error: "This event is not active or has been cancelled." });
-    }
 
     const now = new Date();
-    const eventEnd = new Date(event.event_end_datetime);
+    const expiryTime = new Date(
+      new Date(event.event_end_datetime).getTime() +
+        event.claim_expiry_minutes * 60000
+    );
+    if (now > expiryTime)
+      return res
+        .status(403)
+        .json({ error: "The claim period for this event has expired." });
 
-    const expiryTime = new Date(eventEnd.getTime());
-    expiryTime.setMinutes(expiryTime.getMinutes() + event.claim_expiry_minutes);
-
-    if (now > expiryTime) {
-      return res.status(403).json({
-        error: `The claim period for this event has expired. The link was valid until ${expiryTime.toLocaleString()}.`,
-      });
-    }
-
-    // --- Location Check for Offline Events ---
     if (event.event_type === "offline") {
-      const distance = getDistanceInMeters(
-        event.latitude,
-        event.longitude,
-        attendeeLatitude,
-        attendeeLongitude
-      );
-      if (distance > event.radius) {
+      if (
+        getDistanceInMeters(
+          event.latitude,
+          event.longitude,
+          attendeeLatitude,
+          attendeeLongitude
+        ) > event.radius
+      ) {
         return res
           .status(403)
           .json({ error: `You are too far from the event location.` });
       }
     }
 
-    // --- Smart Claim Logic ---
+    // --- THE ROBUST DUPLICATE CHECK ---
+    const uniqueClaimId = `${event.id}-${userId}`; // Create a unique identifier for this specific claim
+
+    // 1. Check the database for a completed claim
     if (event.issues_badge) {
-      // ON-CHAIN: Mint an NFT Badge
       const existingClaim = await db.get(
         "SELECT id FROM claims WHERE eventId = ? AND attendeeAddress = ?",
         [event.id, userWalletAddress]
       );
       if (existingClaim)
         return res.status(409).json({ error: "Badge already claimed." });
-
-      console.log(`Minting NFT for event ${event.id} for user ${userId}...`);
-      const tx = await contract.mintBadge(
-        event.eventIdOnChain,
-        userWalletAddress
-      );
-      await tx.wait();
-
-      await db.run(
-        "INSERT INTO claims (eventId, attendeeAddress) VALUES (?, ?)",
-        [event.id, userWalletAddress]
-      );
-      res.status(200).json({
-        message: "NFT Badge claimed successfully!",
-        transactionHash: tx.hash,
-      });
     } else {
-      // OFF-CHAIN: Record a Credential
       const existingCred = await db.get(
         "SELECT id FROM attendance_creds WHERE event_id = ? AND user_id = ?",
         [event.id, userId]
       );
       if (existingCred)
         return res.status(409).json({ error: "Credential already claimed." });
-
-      console.log(
-        `Recording credential for event ${event.id} for user ${userId}...`
-      );
-      await db.run(
-        "INSERT INTO attendance_creds (event_id, user_id) VALUES (?, ?)",
-        [event.id, userId]
-      );
-      res
-        .status(200)
-        .json({ message: "Attendance Credential claimed successfully!" });
     }
+
+    // 2. Check our in-memory lock for a pending claim
+    if (pendingClaims.has(uniqueClaimId)) {
+      return res
+        .status(409)
+        .json({
+          error: "Your claim for this event is already being processed.",
+        });
+    }
+
+    // --- If all checks pass, lock and add to queue ---
+    pendingClaims.add(uniqueClaimId); // LOCK
+    const job = { event, userId, userWalletAddress, uniqueClaimId };
+    transactionQueue.push(job);
+
+    console.log(
+      `[API] Job for claim ID "${uniqueClaimId}" added to queue. Queue size: ${transactionQueue.length}`
+    );
+    process.nextTick(processTransactionQueue);
+
+    res.status(202).json({
+      message: "Your claim has been accepted and is being processed.",
+      queuePosition: transactionQueue.length,
+    });
   } catch (error) {
-    console.error(`Error processing claim for UUID ${uuid}:`, error);
-    res.status(500).json({ error: "Failed to process claim." });
+    console.error(`Error adding claim to queue for UUID ${uuid}:`, error);
+    res.status(500).json({ error: "Failed to queue claim." });
   }
 });
 
@@ -637,6 +738,51 @@ app.put("/user/profile", authenticateUser, async (req, res) => {
 });
 
 /**
+ * @api {get} /user/badge/:claimId
+ * Gets detailed information about a specific claimed NFT badge. Protected.
+ * @param {number} claimId - The ID of the claim from the 'claims' table.
+ */
+app.get("/user/badge/:claimId", authenticateUser, async (req, res) => {
+  const { claimId } = req.params;
+  const userWalletAddress = req.user.walletAddress;
+
+  try {
+    const db = await dbPromise;
+
+    // The query ensures the user can only view badges they own.
+    const badgeDetails = await db.get(
+      `
+            SELECT
+                c.id as claimId,
+                c.transaction_hash,
+                c.token_id,
+                c.claimedAt,
+                e.eventName,
+                e.metadataURI
+            FROM claims c
+            JOIN events e ON c.eventId = e.id
+            WHERE c.id = ? AND c.attendeeAddress = ?
+        `,
+      [claimId, userWalletAddress]
+    );
+
+    if (!badgeDetails) {
+      return res.status(404).json({
+        error: "Badge not found or you do not have permission to view it.",
+      });
+    }
+
+    // Add the contract address to the response for convenience
+    badgeDetails.contractAddress = process.env.CONTRACT_ADDRESS;
+
+    res.status(200).json(badgeDetails);
+  } catch (error) {
+    console.error("Error fetching detailed badge info:", error);
+    res.status(500).json({ error: "Failed to fetch badge details." });
+  }
+});
+
+/**
  * @api {put} /organizer/profile
  * Updates the profile of the currently logged-in organization.
  */
@@ -706,7 +852,7 @@ app.put(
       if (!event) {
         return res.status(404).json({ error: "Event not found." });
       }
-      if (event.organizerAddress !== organizationId) {
+      if (Number(event.organizerAddress) !== organizationId) {
         return res
           .status(403)
           .json({ error: "Forbidden: You are not the creator of this event." });
@@ -714,7 +860,7 @@ app.put(
 
       // If checks pass, update the event status to 'cancelled'
       await db.run(
-        `UPDATE events SET status = 'cancelled' WHERE id = ?`,
+        `UPDATE events SET event_status = 'cancelled' WHERE id = ?`,
         eventId
       );
 
@@ -735,6 +881,7 @@ app.put(
  * Retrieves aggregated statistics and event lists for the logged-in organizer.
  */
 app.get("/organizer/dashboard", authenticateOrganizer, async (req, res) => {
+  // Get the ID from the token (it's an integer)
   const organizationId = req.organization.orgId;
 
   try {
@@ -745,19 +892,21 @@ app.get("/organizer/dashboard", authenticateOrganizer, async (req, res) => {
     // 1. Total Events created by this organizer
     const totalEventsResult = await db.get(
       "SELECT COUNT(*) as totalEvents FROM events WHERE organizerAddress = ?",
-      organizationId
+      // FIX: Pass the ID as a string to match the TEXT column type
+      String(organizationId)
     );
 
-    // 2. Active Events (we'll define 'active' as created in the last 30 days for this example)
+    // 2. Active Events
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const activeEventsResult = await db.get(
       `SELECT COUNT(*) as activeEvents FROM events WHERE organizerAddress = ? AND createdAt > ?`,
-      organizationId,
+      // FIX: Pass the ID as a string
+      String(organizationId),
       thirtyDaysAgo.toISOString()
     );
 
-    // 3. Total Badges Distributed (sum of claims for badge-issuing events)
+    // 3. Total Badges Distributed (THE MAIN CULPRIT)
     const badgesDistributedResult = await db.get(
       `
             SELECT COUNT(c.id) as badgesDistributed
@@ -765,10 +914,11 @@ app.get("/organizer/dashboard", authenticateOrganizer, async (req, res) => {
             JOIN events e ON c.eventId = e.id
             WHERE e.organizerAddress = ? AND e.issues_badge = 1
         `,
-      organizationId
+      // FIX: Pass the ID as a string
+      String(organizationId)
     );
 
-    // 4. Claim Rate (total claims / total estimated attendees for events with estimates)
+    // 4. Claim Rate
     const claimRateStats = await db.get(
       `
             SELECT
@@ -778,13 +928,18 @@ app.get("/organizer/dashboard", authenticateOrganizer, async (req, res) => {
             FROM events e
             WHERE e.organizerAddress = ? AND e.estimated_attendees IS NOT NULL
         `,
-      [organizationId, organizationId, organizationId]
+      // FIX: Pass all instances of the ID as strings
+      [
+        String(organizationId),
+        String(organizationId),
+        String(organizationId),
+      ]
     );
 
     let claimRate = 0;
-    if (claimRateStats.totalEstimatedAttendees > 0) {
+    if (claimRateStats && claimRateStats.totalEstimatedAttendees > 0) { // Added null check for safety
       const totalClaims =
-        claimRateStats.totalBadgeClaims + claimRateStats.totalCredClaims;
+        (claimRateStats.totalBadgeClaims || 0) + (claimRateStats.totalCredClaims || 0);
       claimRate = (totalClaims / claimRateStats.totalEstimatedAttendees) * 100;
     }
 
@@ -805,7 +960,8 @@ app.get("/organizer/dashboard", authenticateOrganizer, async (req, res) => {
             WHERE organizerAddress = ?
             ORDER BY createdAt DESC
         `,
-      organizationId
+      // FIX: Pass the ID as a string
+      String(organizationId)
     );
 
     // --- COMPILE RESPONSE ---
@@ -818,13 +974,14 @@ app.get("/organizer/dashboard", authenticateOrganizer, async (req, res) => {
       },
       events: allEvents,
     };
-
+    console.log(dashboardData)
     res.status(200).json(dashboardData);
   } catch (error) {
     console.error("Error fetching organizer dashboard data:", error);
     res.status(500).json({ error: "Failed to fetch dashboard data." });
   }
 });
+
 
 // --- Attendee (User) Dashboard & Discovery Endpoints ---
 
@@ -918,7 +1075,7 @@ app.get("/events/discover", async (req, res) => {
         longitude
       FROM events
       WHERE 
-        status = 'active'
+        event_status = 'active'
         AND event_end_datetime > ?
         AND event_type IN ('online', 'offline')
       ORDER BY event_start_datetime ASC
@@ -961,13 +1118,112 @@ app.get("/events/discover", async (req, res) => {
   }
 });
 
+// Add this new endpoint to the Attendee/User section
+
+/**
+ * @api {get} /verify/:uuid
+ * Public endpoint to verify a credential or badge from a claim link.
+ * This powers the social sharing verification page.
+ */
+app.get("/verify/:uuid", async (req, res) => {
+  const { uuid } = req.params;
+
+  try {
+    const db = await dbPromise;
+
+    // First, find the event associated with this UUID
+    const event = await db.get(
+      `
+            SELECT
+                e.eventName, e.event_start_datetime, e.issues_badge, e.event_type, e.metadataURI,
+                o.name as organizationName, o.city as organizationCity
+            FROM events e
+            JOIN organizations o ON e.organizerAddress = o.id
+            WHERE e.claimLinkUUID = ?
+        `,
+      uuid
+    );
+
+    if (!event) {
+      return res
+        .status(404)
+        .json({ error: "Verification failed: This link is not valid." });
+    }
+
+    let claimDetails = null;
+    let userDetails = null;
+
+    // Now, find out WHO claimed it
+    if (event.issues_badge) {
+      // It's a badge, so check the 'claims' table
+      claimDetails = await db.get(
+        `
+                SELECT c.attendeeAddress, c.claimedAt, u.display_name, u.avatar_url
+                FROM claims c
+                JOIN events e ON c.eventId = e.id
+                LEFT JOIN users u ON c.attendeeAddress = u.wallet_address
+                WHERE e.claimLinkUUID = ?
+            `,
+        uuid
+      );
+    } else {
+      // It's a credential, so check the 'attendance_creds' table
+      claimDetails = await db.get(
+        `
+                SELECT ac.claimed_at as claimedAt, u.wallet_address as attendeeAddress, u.display_name, u.avatar_url
+                FROM attendance_creds ac
+                JOIN events e ON ac.event_id = e.id
+                JOIN users u ON ac.user_id = u.id
+                WHERE e.claimLinkUUID = ?
+            `,
+        uuid
+      );
+    }
+
+    if (!claimDetails) {
+      return res.status(404).json({
+        error: "This credential has been issued but not yet claimed.",
+      });
+    }
+
+    // Construct the final public verification object
+    const verificationData = {
+      issuedTo: claimDetails.display_name || claimDetails.attendeeAddress,
+      eventName: event.eventName,
+      issuedBy: event.organizationName,
+      eventLocation: event.organizationCity,
+      eventDate: new Date(event.event_start_datetime).toLocaleDateString(),
+      claimDate: new Date(claimDetails.claimedAt).toLocaleString(),
+      isNFT: event.issues_badge,
+      metadataURI: event.metadataURI, // Can be used to fetch the image
+    };
+
+    res.status(200).json(verificationData);
+  } catch (error) {
+    console.error("Error verifying credential:", error);
+    res.status(500).json({ error: "Server error during verification." });
+  }
+});
+
 // --- Server Start ---
 // We wrap the server start in a function to ensure the DB is ready first.
+// REPLACE your startServer function with this async version
 async function startServer() {
-  await dbPromise; // Make sure the database is connected
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-  });
+  try {
+    await dbPromise; // Make sure the database is connected
+
+    // --- NEW: Initialize the Relayer Nonce ---
+    const initialNonce = await relayerWallet.getNonce();
+    relayerNonce = initialNonce;
+    console.log(`Relayer nonce initialized to: ${relayerNonce}`);
+
+    app.listen(PORT, () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("FATAL: Failed to start server.", error);
+    process.exit(1);
+  }
 }
 
 startServer();
