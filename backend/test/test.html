@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Proof of Presence - API Tester V2</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; background-color: #f7f7f7; color: #333; }
+        .container { border: 1px solid #ddd; padding: 20px; margin-bottom: 20px; border-radius: 8px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        h1, h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; color: #111; }
+        button { padding: 10px 15px; font-size: 16px; cursor: pointer; border-radius: 5px; border: 1px solid #ccc; background-color: #f0f0f0; transition: background-color 0.2s; }
+        button:hover { background-color: #e0e0e0; }
+        button:disabled { cursor: not-allowed; opacity: 0.6; }
+        .primary-btn { background-color: #007bff; color: white; border-color: #007bff; }
+        .primary-btn:hover { background-color: #0056b3; }
+        code, pre { background-color: #eef; padding: 4px 8px; border-radius: 4px; font-family: 'Courier New', Courier, monospace; }
+        pre { padding: 15px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; }
+        input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="file"] { width: calc(100% - 18px); padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .hidden { display: none; }
+        .status-box { padding: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid; }
+        .status-success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .status-info { background-color: #cce5ff; border-color: #b8daff; color: #004085; }
+        .flex-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <h1>Proof of Presence - API Tester V2</h1>
+    <p><strong>Instructions:</strong> Open your browser's developer console (F12) to see detailed logs. You must have MetaMask installed.</p>
+
+    <!-- Step 1: Connect Wallet -->
+    <div class="container">
+        <h2>1. Connect Wallet</h2>
+        <button id="connectButton" class="primary-btn">Connect MetaMask</button>
+        <div id="walletStatusBox" class="status-box status-info hidden">
+            <strong>Wallet Address:</strong> <code id="walletAddress">N/A</code>
+        </div>
+    </div>
+
+    <!-- Step 2: Organizer Flow -->
+    <div id="organizerContainer" class="container hidden">
+        <h2>2. Organizer Flow</h2>
+        <h4>2a. Register / Login</h4>
+        <div class="flex-group">
+            <input type="email" id="orgEmail" placeholder="organizer@email.com">
+            <input type="password" id="orgPassword" placeholder="Password">
+            <button id="orgRegisterButton">Register</button>
+            <button id="orgLoginButton">Login</button>
+        </div>
+        <div id="orgTokenBox" class="status-box status-success hidden">
+            <strong>Organizer JWT:</strong> <code id="orgToken">N/A</code>
+        </div>
+        
+        <div id="createEventContainer" class="hidden">
+            <h4>2b. Create Event & Issue Badge</h4>
+            <input type="text" id="eventName" placeholder="Event Name (e.g., ETH Denver Meetup)">
+            <input type="text" id="eventDescription" placeholder="Event Description">
+            <label>Badge Image: <input type="file" id="badgeImage" accept="image/*"></label>
+            <button id="createEventButton" class="primary-btn">Create Event</button>
+             <div id="claimLinkBox" class="status-box status-info hidden">
+                <strong>Generated Claim Link:</strong> <code id="claimLink">N/A</code>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Step 3: Attendee/User Flow -->
+    <div id="attendeeContainer" class="container hidden">
+        <h2>3. Attendee Flow</h2>
+        <h4>3a. Authenticate to Get User JWT</h4>
+        <button id="userAuthButton" class="primary-btn">Authenticate with Wallet</button>
+        <div id="userTokenBox" class="status-box status-success hidden">
+            <strong>User JWT:</strong> <code id="userToken">N/A</code>
+        </div>
+
+        <div id="claimContainer" class="hidden">
+             <h4>3b. Claim Badge/Credential</h4>
+             <input type="text" id="claimLinkInput" placeholder="Paste Claim Link from Step 2b Here">
+             <div class="flex-group">
+                <button id="claimValidButton">Claim (Valid Location)</button>
+                <button id="claimInvalidButton">Claim (Invalid Location)</button>
+             </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="container">
+        <h2>API Call Results</h2>
+        <pre id="results">Results will be displayed here...</pre>
+    </div>
+
+<script>
+    const BACKEND_URL = "http://localhost:3001";
+
+    // --- State Variables ---
+    let connectedAccount = null;
+    let orgToken = null;
+    let userToken = null;
+    let currentClaimLink = null;
+
+    // --- Element Selectors ---
+    const connectButton = document.getElementById("connectButton");
+    const walletStatusBox = document.getElementById("walletStatusBox");
+    const walletAddressEl = document.getElementById("walletAddress");
+    const resultsEl = document.getElementById("results");
+
+    // Organizer Elements
+    const organizerContainer = document.getElementById("organizerContainer");
+    const orgEmailInput = document.getElementById("orgEmail");
+    const orgPasswordInput = document.getElementById("orgPassword");
+    const orgRegisterButton = document.getElementById("orgRegisterButton");
+    const orgLoginButton = document.getElementById("orgLoginButton");
+    const orgTokenBox = document.getElementById("orgTokenBox");
+    const orgTokenEl = document.getElementById("orgToken");
+    const createEventContainer = document.getElementById("createEventContainer");
+    const createEventButton = document.getElementById("createEventButton");
+    const claimLinkBox = document.getElementById("claimLinkBox");
+    const claimLinkEl = document.getElementById("claimLink");
+    
+    // Attendee Elements
+    const attendeeContainer = document.getElementById("attendeeContainer");
+    const userAuthButton = document.getElementById("userAuthButton");
+    const userTokenBox = document.getElementById("userTokenBox");
+    const userTokenEl = document.getElementById("userToken");
+    const claimContainer = document.getElementById("claimContainer");
+    const claimLinkInput = document.getElementById("claimLinkInput");
+    const claimValidButton = document.getElementById("claimValidButton");
+    const claimInvalidButton = document.getElementById("claimInvalidButton");
+    
+    // --- Location Data ---
+    const ATTENDEE_LOCATION_VALID = { latitude: 48.858, longitude: 2.2946 }; // Close to Eiffel Tower
+    const ATTENDEE_LOCATION_INVALID = { latitude: 50.0, longitude: 2.0 }; // Far away
+
+    // --- Event Listeners ---
+    connectButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        try {
+            const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+            connectedAccount = accounts[0];
+            walletAddressEl.textContent = connectedAccount;
+            walletStatusBox.classList.remove("hidden");
+            organizerContainer.classList.remove("hidden");
+            attendeeContainer.classList.remove("hidden");
+            logResult("Wallet connected successfully!", { account: connectedAccount });
+        } catch (error) {
+            logError("Failed to connect wallet.", error);
+        }
+    });
+
+    orgRegisterButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        const email = orgEmailInput.value;
+        const password = orgPasswordInput.value;
+        if (!email || !password) return alert("Email and Password are required for registration.");
+        
+        logResult("Attempting to register new organization...");
+        try {
+            const response = await fetch(`${BACKEND_URL}/auth/organization/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: "Test Org via HTML",
+                    admin_name: "Test Admin",
+                    admin_email: email,
+                    password: password
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw data;
+            logResult("Organization registered! Please login.", data);
+            alert("Registration successful! Now please log in with the same credentials.");
+        } catch (error) {
+            logError("Failed to register organization.", error);
+        }
+    });
+
+    orgLoginButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        const email = orgEmailInput.value;
+        const password = orgPasswordInput.value;
+        if (!email || !password) return alert("Email and Password are required for login.");
+
+        logResult("Attempting to log in as organizer...");
+        try {
+            const response = await fetch(`${BACKEND_URL}/auth/organization/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ admin_email: email, password: password }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw data;
+
+            orgToken = data.token;
+            orgTokenEl.textContent = orgToken.substring(0, 30) + "...";
+            orgTokenBox.classList.remove("hidden");
+            createEventContainer.classList.remove("hidden");
+            logResult("Organizer login successful!", { token: orgToken.substring(0, 30) + "..." });
+        } catch (error) {
+            logError("Failed to login as organizer.", error);
+        }
+    });
+
+    createEventButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (!orgToken) return alert("Please log in as an organizer first.");
+        
+        const eventName = document.getElementById('eventName').value;
+        const eventDescription = document.getElementById('eventDescription').value;
+        const badgeImageFile = document.getElementById('badgeImage').files[0];
+
+        if (!eventName || !badgeImageFile) return alert("Event Name and Badge Image are required.");
+
+        logResult("Creating event with form data...");
+        try {
+            const formData = new FormData();
+            formData.append('eventName', eventName);
+            formData.append('eventDescription', eventDescription);
+            formData.append('badgeImage', badgeImageFile);
+            formData.append('isOnline', 'false');
+            formData.append('issuesBadge', 'true');
+            formData.append('latitude', 48.8584); // Eiffel Tower
+            formData.append('longitude', 2.2945);
+            formData.append('radius', 500);
+            
+            // Set event to be active now
+            const eventStart = new Date();
+            eventStart.setHours(eventStart.getHours() - 1);
+            const eventEnd = new Date();
+            eventEnd.setHours(eventEnd.getHours() + 2);
+
+            formData.append('eventStart', eventStart.toISOString());
+            formData.append('eventEnd', eventEnd.toISOString());
+
+            const response = await fetch(`${BACKEND_URL}/organizer/issue-badge`, {
+                method: "POST",
+                headers: { 'Authorization': `Bearer ${orgToken}` }, // NOTE: Do NOT set Content-Type for FormData
+                body: formData,
+            });
+            const data = await response.json();
+            if (!response.ok) throw data;
+
+            currentClaimLink = data.claimLink;
+            claimLinkEl.textContent = currentClaimLink;
+            claimLinkInput.value = currentClaimLink;
+            claimLinkBox.classList.remove("hidden");
+            logResult("Event created successfully!", data);
+        } catch(error) {
+            logError("Failed to create event.", error);
+        }
+    });
+
+    userAuthButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (!connectedAccount) return alert("Please connect your wallet first.");
+
+        logResult("Starting user authentication...");
+        try {
+            // 1. Get Challenge
+            logResult("Step 1: Getting challenge from server...");
+            const challengeRes = await fetch(`${BACKEND_URL}/auth/user/challenge`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ walletAddress: connectedAccount }),
+            });
+            const challengeData = await challengeRes.json();
+            if (!challengeRes.ok) throw challengeData;
+            logResult("Challenge received.", { message: challengeData.message });
+
+            // 2. Sign Message
+            logResult("Step 2: Please sign the message in MetaMask...");
+            const signature = await window.ethereum.request({
+                method: "personal_sign",
+                params: [challengeData.message, connectedAccount],
+            });
+            logResult("Signature obtained!", { signature: signature.substring(0, 40) + "..." });
+
+            // 3. Verify Signature
+            logResult("Step 3: Verifying signature with server...");
+            const verifyRes = await fetch(`${BACKEND_URL}/auth/user/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    walletAddress: connectedAccount,
+                    message: challengeData.message,
+                    signature: signature
+                }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) throw verifyData;
+            
+            userToken = verifyData.token;
+            userTokenEl.textContent = userToken.substring(0, 30) + "...";
+            userTokenBox.classList.remove("hidden");
+            claimContainer.classList.remove("hidden");
+            logResult("User authentication successful!", { token: userToken.substring(0, 30) + "..." });
+        } catch (error) {
+            logError("User authentication failed.", error);
+        }
+    });
+
+    claimValidButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        handleClaim(ATTENDEE_LOCATION_VALID);
+    });
+
+    claimInvalidButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        handleClaim(ATTENDEE_LOCATION_INVALID);
+    });
+
+    async function handleClaim(location) {
+        if (!userToken) return alert("Please authenticate as a user first.");
+        const link = claimLinkInput.value;
+        if (!link) return alert("Please create an event and provide the claim link.");
+
+        logResult(`Attempting to claim from ${location === ATTENDEE_LOCATION_VALID ? 'VALID' : 'INVALID'} location...`);
+        try {
+            const response = await fetch(link, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${userToken}`
+                },
+                body: JSON.stringify({
+                    attendeeLatitude: location.latitude,
+                    attendeeLongitude: location.longitude
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw data;
+            logResult("Claim request accepted by server! It is now being processed.", data);
+            alert("Claim request accepted! Your badge will appear in your collection shortly.");
+        } catch(error) {
+            logError("Failed to claim badge.", error);
+        }
+    }
+
+    // --- Helper Functions ---
+    function logResult(message, data = "") {
+        console.log(message, data);
+        resultsEl.textContent = `✅ SUCCESS: ${message}\n\n${JSON.stringify(data, null, 2)}`;
+    }
+    function logError(message, error = "") {
+        console.error(message, error);
+        resultsEl.textContent = `❌ ERROR: ${message}\n\n${JSON.stringify(error, null, 2)}`;
+    }
+
+</script>
+</body>
+</html>
