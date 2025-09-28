@@ -53,32 +53,52 @@ contract ProofOfPresence is ERC721, AccessControl {
         });
     }
 
-    function mintBadge(uint256 _eventId, address _attendee) public onlyRole(RELAYER_ROLE) {
+    function mintBadge(
+        uint256 _eventId,
+        address _attendee
+    ) public onlyRole(RELAYER_ROLE) {
         require(events[_eventId].exists, "Event does not exist.");
-        require(!hasClaimed[_eventId][_attendee], "Attendee has already claimed this badge.");
+        require(
+            !hasClaimed[_eventId][_attendee],
+            "Attendee has already claimed this badge."
+        );
         _tokenIds.increment();
         uint256 newTokenId = _tokenIds.current();
         hasClaimed[_eventId][_attendee] = true;
         _tokenToEvent[newTokenId] = _eventId;
         _safeMint(_attendee, newTokenId);
     }
-    
+
     /**
      * @dev UPDATED tokenURI FUNCTION: Now constructs the full metadata URL.
      * It combines the base URI with the specific event ID for the token.
      */
-    function tokenURI(uint256 _tokenId) public view override returns (string memory) {
-        require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
+    function tokenURI(
+        uint256 _tokenId
+    ) public view override returns (string memory) {
+        require(
+            _exists(_tokenId),
+            "ERC721Metadata: URI query for nonexistent token"
+        );
         uint256 eventId = _tokenToEvent[_tokenId];
         // Concatenates the base URI with the event ID (e.g., "http://.../metadata/" + "1")
-        return bytes(_baseTokenURI).length > 0 ? string(abi.encodePacked(_baseTokenURI, eventId.toString())) : "";
+        return
+            bytes(_baseTokenURI).length > 0
+                ? string(abi.encodePacked(_baseTokenURI, eventId.toString()))
+                : "";
     }
 
     // getLatestEventId and supportsInterface functions remain the same...
     function getLatestEventId() public view returns (uint256) {
         return _eventIds.current();
     }
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC721, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+    // Add this to ProofOfPresence.sol
+    function getLatestTokenId() public view returns (uint256) {
+        return _tokenIds.current();
     }
 }
