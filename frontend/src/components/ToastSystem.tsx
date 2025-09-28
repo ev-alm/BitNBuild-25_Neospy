@@ -1,11 +1,10 @@
 import { useState, useEffect, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle, X, Trophy, Sparkles } from 'lucide-react';
+import { CheckCircle, X, Trophy, Sparkles, AlertCircle } from 'lucide-react';
 
 interface Toast {
   id: string;
-  title: string;
-  description?: string;
+  message: string;
   type: 'success' | 'error' | 'info';
   duration?: number;
 }
@@ -20,7 +19,7 @@ const ToastItem = forwardRef<HTMLDivElement, { toast: Toast; onRemove: (id: stri
   useEffect(() => {
     const timer = setTimeout(() => {
       onRemove(toast.id);
-    }, toast.duration || 5000);
+    }, toast.duration || 4000);
 
     return () => clearTimeout(timer);
   }, [toast.id, toast.duration, onRemove]);
@@ -28,48 +27,45 @@ const ToastItem = forwardRef<HTMLDivElement, { toast: Toast; onRemove: (id: stri
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return <Trophy className="w-6 h-6 text-green-600" />;
+        return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'error':
-        return <X className="w-6 h-6 text-red-600" />;
+        return <AlertCircle className="w-5 h-5 text-red-600" />;
       default:
-        return <Sparkles className="w-6 h-6 text-blue-600" />;
+        return <Sparkles className="w-5 h-5 text-blue-600" />;
     }
   };
 
   const getColors = () => {
     switch (toast.type) {
       case 'success':
-        return 'border-green-200 bg-green-50 text-green-800';
+        return 'border-green-200/50 bg-green-50/90 text-green-800';
       case 'error':
-        return 'border-red-200 bg-red-50 text-red-800';
+        return 'border-red-200/50 bg-red-50/90 text-red-800';
       default:
-        return 'border-blue-200 bg-blue-50 text-blue-800';
+        return 'border-blue-200/50 bg-blue-50/90 text-blue-800';
     }
   };
 
     return (
       <motion.div
         ref={ref}
-        initial={{ opacity: 0, y: 50, scale: 0.8 }}
+        initial={{ opacity: 0, y: -20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -50, scale: 0.8 }}
-        className={`professional-card rounded-xl p-4 border ${getColors()} min-w-[320px] max-w-md`}
+        exit={{ opacity: 0, y: -20, scale: 0.95 }}
+        className={`glass-card rounded-xl p-4 border ${getColors()} min-w-[320px] max-w-md shadow-lg`}
       >
         <div className="flex items-start space-x-3">
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 mt-0.5">
             {getIcon()}
           </div>
           
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold mb-1">{toast.title}</h4>
-            {toast.description && (
-              <p className="text-sm opacity-80">{toast.description}</p>
-            )}
+            <p className="text-sm font-medium leading-relaxed">{toast.message}</p>
           </div>
           
           <button
             onClick={() => onRemove(toast.id)}
-            className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+            className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -84,7 +80,7 @@ ToastItem.displayName = 'ToastItem';
 
 export default function ToastSystem({ toasts, onRemove }: ToastSystemProps) {
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-3">
+    <div className="fixed top-4 right-4 z-[100] space-y-2">
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <ToastItem
@@ -102,9 +98,10 @@ export default function ToastSystem({ toasts, onRemove }: ToastSystemProps) {
 export const useToast = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (toast: Omit<Toast, 'id'>) => {
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info', duration?: number) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts(prev => [...prev, { ...toast, id }]);
+    const toast: Toast = { id, message, type, duration };
+    setToasts(prev => [...prev, toast]);
     return id;
   };
 

@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { Mail, Lock, ArrowLeft, Crown, Users } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Eye, EyeOff, ArrowLeft, Mail, Lock, Award, Users, User } from 'lucide-react';
+import { ImageWithFallback } from './figma/ImageWithFallback';
 
 interface LoginPageProps {
   onLogin: (email: string, password: string, role: 'organizer' | 'user') => void;
@@ -12,158 +10,210 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin, onSwitchToSignUp, onBack, defaultRole }: LoginPageProps) {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    role: defaultRole || 'user' as 'organizer' | 'user'
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<'organizer' | 'user'>(defaultRole || 'user');
   const [isLoading, setIsLoading] = useState(false);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    if (!formData.email.includes('@')) newErrors.email = 'Valid email is required';
-    if (!formData.password) newErrors.password = 'Password is required';
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) return;
     
-    if (validateForm()) {
-      setIsLoading(true);
-      setErrors({});
-      
-      // Simulate login process
-      setTimeout(() => {
-        onLogin(formData.email, formData.password, formData.role);
-        setIsLoading(false);
-      }, 1500);
-    }
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    onLogin(email, password, selectedRole);
+    setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        {/* Back Button */}
-        <Button
-          type="button"
-          onClick={onBack}
-          variant="ghost"
-          className="mb-6 text-slate-600 hover:text-slate-900"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
-        </Button>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Floating Particles Background */}
+      <div className="floating-particles"></div>
+      
+      <div className="relative z-10 min-h-screen flex">
+        {/* Left Side - Login Form */}
+        <div className="flex-1 flex items-center justify-center px-6 py-12 lg:px-8">
+          <div className="w-full max-w-md">
+            {/* Back Button */}
+            <button
+              onClick={onBack}
+              className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 transition-colors mb-8 group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span>Back to home</span>
+            </button>
 
-        {/* Welcome Text */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h1>
-          <p className="text-slate-600">
-            Sign in as {formData.role === 'organizer' ? 'Organizer' : 'User'}
-          </p>
-        </div>
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center space-x-3 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                  <Award className="w-7 h-7 text-white" />
+                </div>
+                <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                  POAP
+                </span>
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome back</h1>
+              <p className="text-slate-600">Sign in to your account to continue</p>
+            </div>
 
-        {/* Role Selector - only show if no default role */}
-        {!defaultRole && (
-          <div className="mb-6">
-            <Label className="block text-slate-700 mb-3 text-center font-medium">Sign in as</Label>
-            <div className="flex professional-card rounded-lg p-1">
-              {[
-                { id: 'user', label: 'User', icon: Users },
-                { id: 'organizer', label: 'Organizer', icon: Crown }
-              ].map((role) => {
-                const Icon = role.icon;
-                const isSelected = formData.role === role.id;
-                
-                return (
+            {/* Role Selection */}
+            <div className="mb-6">
+              <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('user')}
+                  className={`flex items-center justify-center space-x-2 py-3 px-4 rounded-lg transition-all duration-200 ${
+                    selectedRole === 'user'
+                      ? 'bg-white shadow-sm text-blue-600'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span className="font-medium">Attendee</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('organizer')}
+                  className={`flex items-center justify-center space-x-2 py-3 px-4 rounded-lg transition-all duration-200 ${
+                    selectedRole === 'organizer'
+                      ? 'bg-white shadow-sm text-blue-600'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="font-medium">Organizer</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Login Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                  Email address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Enter your email"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Enter your password"
+                    required
+                  />
                   <button
-                    key={role.id}
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, role: role.id as 'organizer' | 'user' }))}
-                    className={`
-                      flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md transition-all duration-200 font-medium
-                      ${isSelected 
-                        ? 'primary-button text-white' 
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }
-                    `}
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{role.label}</span>
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
-                );
-              })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-slate-600">Remember me</span>
+                </label>
+                <button type="button" className="text-sm text-blue-600 hover:text-blue-700 transition-colors">
+                  Forgot password?
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading || !email || !password}
+                className="w-full gradient-button py-3 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+              >
+                {isLoading && (
+                  <div className="absolute inset-0 shimmer"></div>
+                )}
+                <span className="relative">
+                  {isLoading ? 'Signing in...' : 'Sign in'}
+                </span>
+              </button>
+            </form>
+
+            {/* Sign Up Link */}
+            <div className="mt-6 text-center">
+              <span className="text-slate-600">Don't have an account? </span>
+              <button
+                onClick={onSwitchToSignUp}
+                className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+              >
+                Sign up
+              </button>
+            </div>
+
+            {/* Demo Credentials */}
+            <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
+              <h4 className="font-medium text-blue-900 mb-2">Demo Credentials</h4>
+              <div className="text-sm text-blue-700 space-y-1">
+                <div>Email: demo@example.com</div>
+                <div>Password: demo123</div>
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="professional-card rounded-xl p-6 space-y-6">
-          {/* Email */}
-          <div className="space-y-2">
-            <Label className="flex items-center space-x-2 text-slate-700 font-medium">
-              <Mail className="w-4 h-4" />
-              <span>Email Address</span>
-            </Label>
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={formData.email}
-              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-              className={`w-full ${errors.email ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-blue-500'}`}
-            />
-            {errors.email && (
-              <p className="text-sm text-red-600">{errors.email}</p>
-            )}
+        {/* Right Side - Illustration */}
+        <div className="hidden lg:flex flex-1 items-center justify-center p-12 bg-gradient-to-br from-blue-50 to-cyan-50">
+          <div className="max-w-lg">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 rounded-3xl transform rotate-3"></div>
+              <div className="relative glass-card rounded-3xl p-8 transform -rotate-1">
+                <ImageWithFallback
+                  src="https://images.unsplash.com/photo-1645839078449-124db8a049fd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibG9ja2NoYWluJTIwdGVjaG5vbG9neSUyMG5ldHdvcmt8ZW58MXx8fHwxNzU5MDI4MDIyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+                  alt="Blockchain Technology"
+                  className="w-full h-80 object-cover rounded-2xl"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl"></div>
+              </div>
+              
+              {/* Floating Elements */}
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center animate-pulse">
+                <Award className="w-6 h-6 text-white" />
+              </div>
+            </div>
+
+            <div className="mt-8 text-center">
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">
+                Secure & Verified
+              </h3>
+              <p className="text-slate-600 leading-relaxed">
+                Join thousands of users and organizations who trust our platform 
+                for secure, blockchain-verified digital badge management.
+              </p>
+            </div>
           </div>
-
-          {/* Password */}
-          <div className="space-y-2">
-            <Label className="flex items-center space-x-2 text-slate-700 font-medium">
-              <Lock className="w-4 h-4" />
-              <span>Password</span>
-            </Label>
-            <Input
-              type="password"
-              placeholder="Enter your password"
-              value={formData.password}
-              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-              className={`w-full ${errors.password ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-blue-500'}`}
-            />
-            {errors.password && (
-              <p className="text-sm text-red-600">{errors.password}</p>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="w-full primary-button py-3 text-base"
-          >
-            {isLoading ? 'Signing In...' : 'Sign In'}
-          </Button>
-
-          {/* Sign Up Link */}
-          <div className="text-center pt-4">
-            <p className="text-slate-600">
-              Don't have an account?{' '}
-              <button
-                type="button"
-                onClick={onSwitchToSignUp}
-                className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
-              >
-                Sign up here
-              </button>
-            </p>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );
