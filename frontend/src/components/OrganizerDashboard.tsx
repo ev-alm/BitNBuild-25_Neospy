@@ -1,17 +1,12 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
 import { 
   Plus, 
   Calendar, 
   Users, 
   Trophy, 
-  BarChart3, 
   QrCode, 
   Eye,
-  Sparkles,
-  TrendingUp,
-  Award,
-  Clock
+  TrendingUp
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -93,7 +88,7 @@ export default function OrganizerDashboard({ user, onToast }: OrganizerDashboard
           <Button
             onClick={() => setCurrentView('dashboard')}
             variant="outline"
-            className="glass-card border-purple-400/30 text-purple-200 hover:text-white"
+            className="text-slate-600 hover:text-slate-900 border-slate-200"
           >
             ← Back to Dashboard
           </Button>
@@ -106,136 +101,108 @@ export default function OrganizerDashboard({ user, onToast }: OrganizerDashboard
   return (
     <div className="space-y-8">
       {/* Header */}
-      <motion.div 
-        className="flex items-center justify-between"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Organizer Dashboard</h1>
-          <p className="text-purple-300">Welcome back, {user.name}!</p>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Organizer Dashboard</h1>
+          <p className="text-slate-600">Welcome back, {user.name}! Manage your events and track engagement.</p>
         </div>
         
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <Button
+          onClick={() => setCurrentView('create-event')}
+          className="bg-blue-600 hover:bg-blue-700 text-black px-6 py-3 rounded-lg shadow-sm"
         >
-          <Button
-            onClick={() => setCurrentView('create-event')}
-            className="glow-button px-6 py-3 text-lg rounded-xl"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Create Event
-          </Button>
-        </motion.div>
-      </motion.div>
+          <Plus className="w-4 h-4 mr-2" />
+          Create Event
+        </Button>
+      </div>
 
       {/* Stats Grid */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {[
           {
             title: 'Total Events',
             value: stats.totalEvents,
             icon: Calendar,
-            color: 'from-blue-400 to-blue-600',
+            color: 'bg-[#1e40af]',
             suffix: ''
           },
           {
             title: 'Total Claims',
             value: stats.totalClaims,
             icon: Trophy,
-            color: 'from-purple-400 to-purple-600',
+            color: 'bg-[#0f766e]',
             suffix: ''
           },
           {
             title: 'Active Events',
             value: stats.activeEvents,
             icon: Users,
-            color: 'from-green-400 to-green-600',
+            color: 'bg-[#059669]',
             suffix: ''
           },
           {
             title: 'Avg Claim Rate',
             value: stats.avgClaimRate,
             icon: TrendingUp,
-            color: 'from-pink-400 to-pink-600',
+            color: 'bg-[#1e40af]',
             suffix: '%'
           }
-        ].map((stat, index) => {
+        ].map((stat) => {
           const Icon = stat.icon;
           
           return (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + index * 0.1 }}
-            >
-              <Card className="glass-card border-purple-400/30 hover:border-purple-400/50 transition-colors">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-300 text-sm font-medium">{stat.title}</p>
-                      <p className="text-2xl font-bold text-white">
-                        {stat.value}{stat.suffix}
-                      </p>
-                    </div>
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
-                      <Icon className="w-6 h-6 text-white" />
-                    </div>
+            <Card key={stat.title} className="professional-card border-0 shadow-sm bg-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">{stat.title}</p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {stat.value}{stat.suffix}
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                  <div className={`p-3 rounded-lg ${stat.color}`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           );
         })}
-      </motion.div>
+      </div>
 
       {/* Recent Events */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card className="glass-card border-purple-400/30">
+      <div>
+        <Card className="professional-card border-0 shadow-sm bg-white">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-white">
-              <BarChart3 className="w-5 h-5 text-purple-400" />
+            <CardTitle className="flex items-center space-x-2 text-slate-900">
+              <Calendar className="w-5 h-5 text-blue-600" />
               <span>Your Events</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {events.map((event, index) => (
-              <motion.div
+            {events.map((event) => (
+              <div
                 key={event.id}
-                className="glass-card rounded-xl p-4 hover:bg-white/5 transition-colors"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + index * 0.1 }}
+                className="professional-card rounded-lg p-4 hover:shadow-md transition-all duration-200"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
-                      <h3 className="font-bold text-white">{event.name}</h3>
+                      <h3 className="font-semibold text-slate-900">{event.name}</h3>
                       <span className={`
                         px-2 py-1 rounded-full text-xs font-medium
                         ${event.status === 'active' 
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                          ? 'bg-green-100 text-green-700 border border-green-200' 
                           : event.status === 'upcoming'
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                          : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : 'bg-gray-100 text-gray-700 border border-gray-200'
                         }
                       `}>
                         {event.status}
                       </span>
                     </div>
                     
-                    <div className="flex items-center space-x-4 mt-2 text-sm text-purple-300">
+                    <div className="flex items-center space-x-4 mt-2 text-sm text-slate-600">
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-3 h-3" />
                         <span>{new Date(event.date).toLocaleDateString()}</span>
@@ -248,12 +215,10 @@ export default function OrganizerDashboard({ user, onToast }: OrganizerDashboard
                     
                     {/* Progress Bar */}
                     <div className="mt-3">
-                      <div className="w-full bg-purple-900/30 rounded-full h-2">
-                        <motion.div
-                          className="bg-gradient-to-r from-purple-400 to-pink-400 h-2 rounded-full"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${(event.totalClaims / event.maxClaims) * 100}%` }}
-                          transition={{ duration: 1, delay: 0.5 + index * 0.1 }}
+                      <div className="w-full bg-slate-200 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-blue-600 to-teal-600 h-2 rounded-full transition-all duration-1000"
+                          style={{ width: `${(event.totalClaims / event.maxClaims) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -263,7 +228,7 @@ export default function OrganizerDashboard({ user, onToast }: OrganizerDashboard
                     <Button
                       size="sm"
                       variant="outline"
-                      className="glass-card border-purple-400/30 text-purple-200 hover:text-white"
+                      className="text-slate-600 hover:text-slate-900 border-slate-200"
                     >
                       <QrCode className="w-4 h-4" />
                     </Button>
@@ -271,76 +236,39 @@ export default function OrganizerDashboard({ user, onToast }: OrganizerDashboard
                     <Button
                       size="sm"
                       variant="outline"
-                      className="glass-card border-purple-400/30 text-purple-200 hover:text-white"
+                      className="text-slate-600 hover:text-slate-900 border-slate-200"
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
       {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card className="glass-card border-purple-400/30">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-white">
-              <Sparkles className="w-5 h-5 text-purple-400" />
-              <span>Quick Actions</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                {
-                  title: 'Create Event',
-                  description: 'Set up a new POAP event',
-                  icon: Plus,
-                  action: () => setCurrentView('create-event')
-                },
-                {
-                  title: 'View Analytics',
-                  description: 'Check event performance',
-                  icon: BarChart3,
-                  action: () => {}
-                },
-                {
-                  title: 'Manage POAPs',
-                  description: 'Edit existing events',
-                  icon: Award,
-                  action: () => {}
-                }
-              ].map((action, index) => {
-                const Icon = action.icon;
-                
-                return (
-                  <motion.button
-                    key={action.title}
-                    onClick={action.action}
-                    className="glass-card rounded-xl p-4 text-left hover:bg-white/5 transition-colors group"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 + index * 0.1 }}
-                  >
-                    <Icon className="w-8 h-8 text-purple-400 mb-3 group-hover:text-purple-300 transition-colors" />
-                    <h3 className="font-bold text-white mb-1">{action.title}</h3>
-                    <p className="text-sm text-purple-300">{action.description}</p>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <Card className="professional-card border-0 shadow-sm bg-white">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-slate-900">
+            <Plus className="w-5 h-5 text-blue-600" />
+            <span>Quick Actions</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <button
+              onClick={() => setCurrentView('create-event')}
+              className="professional-card rounded-lg p-6 text-left hover:shadow-md transition-all duration-200 group border border-slate-200"
+            >
+              <Plus className="w-8 h-8 text-blue-600 mb-3 group-hover:text-blue-700 transition-colors" />
+              <h3 className="font-semibold text-slate-900 mb-1">Create Event</h3>
+              <p className="text-sm text-slate-600">Set up a new POAP event</p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

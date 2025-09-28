@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
 import { Award, CheckCircle, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import BadgeCard from './BadgeCard';
@@ -51,12 +50,7 @@ export default function ClaimPage({ onToast }: ClaimPageProps) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <motion.div
-          className="text-center mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
+        <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Award className="w-8 h-8 text-white" />
           </div>
@@ -66,15 +60,10 @@ export default function ClaimPage({ onToast }: ClaimPageProps) {
           <p className="text-slate-600 text-lg">
             You're about to claim a proof of attendance badge
           </p>
-        </motion.div>
+        </div>
 
         {/* Badge Preview */}
-        <motion.div
-          className="flex justify-center mb-8"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
+        <div className="flex justify-center mb-8">
           <div className="w-80">
             <BadgeCard 
               badge={eventBadge} 
@@ -82,15 +71,10 @@ export default function ClaimPage({ onToast }: ClaimPageProps) {
               showDetails={true}
             />
           </div>
-        </motion.div>
+        </div>
 
         {/* Event Info */}
-        <motion.div
-          className="professional-card rounded-xl p-6 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
+        <div className="professional-card rounded-xl p-6 mb-8">
           <h3 className="text-xl font-bold text-slate-900 mb-4">Event Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-600">
             <div>
@@ -110,15 +94,10 @@ export default function ClaimPage({ onToast }: ClaimPageProps) {
               <p>{eventBadge.attendees.toLocaleString()}</p>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Claim Button */}
-        <motion.div
-          className="text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
+        <div className="text-center">
           {claimState === 'idle' && (
             <Button
               onClick={handleClaimBadge}
@@ -140,12 +119,7 @@ export default function ClaimPage({ onToast }: ClaimPageProps) {
           )}
 
           {claimState === 'claimed' && (
-            <motion.div
-              className="space-y-4"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-            >
+            <div className="space-y-4">
               <div className="professional-card rounded-xl p-6 bg-green-50 border-green-200">
                 <div className="flex items-center justify-center space-x-3 text-green-800">
                   <CheckCircle className="w-8 h-8" />
@@ -164,9 +138,9 @@ export default function ClaimPage({ onToast }: ClaimPageProps) {
               >
                 View My Collection
               </Button>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
       </div>
 
       {/* Confetti Effect */}
