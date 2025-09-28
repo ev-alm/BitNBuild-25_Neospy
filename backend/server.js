@@ -5,6 +5,9 @@ const { ethers, JsonRpcProvider } = require('ethers');
 const { v4: uuidv4 } = require('uuid'); // To generate unique claim IDs
 const { create } = require('ipfs-http-client'); // IPFS client
 const multer = require('multer'); // Middleware for handling file uploads
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { randomBytes } = require('crypto')
 require('dotenv').config();
 
 const dbPromise = require('./db/database.js'); // Our database setup
@@ -57,6 +60,37 @@ function getDistanceInMeters(lat1, lon1, lat2, lon2) {
     return R * c; // Distance in meters
 }
 
+// --- Middleware for Protecting Routes ---
+const authenticateOrganizer = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
+
+    if (token == null) {
+        return res.sendStatus(401); // Unauthorized
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, org) => {
+        if (err) {
+            return res.sendStatus(403); // Forbidden (invalid token)
+        }
+        req.organization = org; // Add the decoded token payload to the request object
+        next(); // Proceed to the next function in the chain
+    });
+};
+
+const authenticateUser = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user; // Add the user payload to the request
+        next();
+    });
+};
+
 // --- API Endpoints ---
 
 /**
@@ -70,7 +104,7 @@ function getDistanceInMeters(lat1, lon1, lat2, lon2) {
  * @field {number} longitude
  * @field {number} radius
  */
-app.post('/organizer/issue-badge', upload.single('badgeImage'), async (req, res) => {
+app.post('/organizer/issue-badge', authenticateOrganizer, upload.single('badgeImage'), async (req, res) => {
     const { organizerAddress, eventName, eventDescription, latitude, longitude, radius } = req.body;
     
     // Check for the uploaded file
@@ -283,6 +317,189 @@ app.get('/metadata/:eventIdOnChain', async (req, res) => {
     } catch (error) {
         console.error("Error fetching metadata from IPFS:", error);
         res.status(500).json({ error: 'Failed to fetch metadata.' });
+    }
+});
+
+/**
+ * @api {post} /auth/organization/register
+ * Creates a new organization account.
+ */
+app.post('/auth/organization/register', async (req, res) => {
+    const {
+        name, logo_url, website, industry, country, city,
+        admin_name, admin_email, password
+    } = req.body;
+
+    // Basic validation
+    if (!name || !admin_name || !admin_email || !password) {
+        return res.status(400).json({ error: 'Required fields are missing.' });
+    }
+
+    try {
+        const db = await dbPromise;
+
+        // Check if email already exists
+        const existingOrg = await db.get('SELECT id FROM organizations WHERE admin_email = ?', admin_email);
+        if (existingOrg) {
+            return res.status(409).json({ error: 'An account with this email already exists.' });
+        }
+
+        // Hash the password before storing it
+        const password_hash = await bcrypt.hash(password, 10); // 10 is the salt rounds
+
+        const result = await db.run(
+            `INSERT INTO organizations (name, logo_url, website, industry, country, city, admin_name, admin_email, password_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [name, logo_url, website, industry, country, city, admin_name, admin_email, password_hash]
+        );
+
+        res.status(201).json({ message: 'Organization registered successfully!', organizationId: result.lastID });
+    } catch (error) {
+        console.error("Error during organization registration:", error);
+        res.status(500).json({ error: 'Server error during registration.' });
+    }
+});
+
+
+/**
+ * @api {post} /auth/organization/login
+ * Logs in an organization and returns a JWT.
+ */
+app.post('/auth/organization/login', async (req, res) => {
+    const { admin_email, password } = req.body;
+    if (!admin_email || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    try {
+        const db = await dbPromise;
+        const org = await db.get('SELECT id, password_hash FROM organizations WHERE admin_email = ?', admin_email);
+
+        // Check if org exists and if password is correct
+        if (!org || !(await bcrypt.compare(password, org.password_hash))) {
+            return res.status(401).json({ error: 'Invalid email or password.' });
+        }
+
+        // If credentials are valid, create a JWT
+        const payload = {
+            orgId: org.id,
+            email: admin_email
+        };
+        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' }); // Token expires in 8 hours
+
+        res.status(200).json({ message: 'Login successful!', token: token });
+
+    } catch (error) {
+        console.error("Error during organization login:", error);
+        res.status(500).json({ error: 'Server error during login.' });
+    }
+});
+
+/**
+ * @api {post} /auth/user/challenge
+ * Generates a unique message for a user to sign.
+ * @body {string} walletAddress - The user's wallet address.
+ */
+app.post('/auth/user/challenge', async (req, res) => {
+    const { walletAddress } = req.body;
+    if (!ethers.isAddress(walletAddress)) {
+        return res.status(400).json({ error: 'Invalid wallet address.' });
+    }
+    
+    // Generate a secure, random nonce
+    const nonce = randomBytes(16).toString('hex');
+    const message = `Welcome to Proof of Presence! Sign this message to authenticate.\n\nNonce: ${nonce}`;
+
+    // In a production app, you would save this nonce to the user's record in the DB
+    // with an expiry to prevent replay attacks. For now, we send it directly.
+    
+    res.status(200).json({ message: message });
+});
+
+
+/**
+ * @api {post} /auth/user/verify
+ * Verifies a signed message and logs the user in, returning a JWT.
+ */
+app.post('/auth/user/verify', async (req, res) => {
+    const { walletAddress, message, signature } = req.body;
+    if (!walletAddress || !message || !signature) {
+        return res.status(400).json({ error: 'walletAddress, message, and signature are required.' });
+    }
+
+    try {
+        // Step 1: Verify the signature
+        const signerAddress = ethers.verifyMessage(message, signature);
+        if (signerAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+            return res.status(401).json({ error: 'Signature verification failed. Wallet address does not match signer.' });
+        }
+        
+        const db = await dbPromise;
+        
+        // Step 2: Find or create the user in the database
+        let user = await db.get('SELECT * FROM users WHERE wallet_address = ?', walletAddress);
+        if (!user) {
+            console.log(`First-time login for ${walletAddress}. Creating user profile.`);
+            const result = await db.run('INSERT INTO users (wallet_address) VALUES (?)', walletAddress);
+            user = { id: result.lastID, wallet_address: walletAddress };
+        }
+
+        // Step 3: Create a JWT for the authenticated user
+        const payload = {
+            userId: user.id,
+            walletAddress: user.wallet_address
+        };
+        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
+
+        res.status(200).json({ message: 'Login successful!', token: token });
+
+    } catch (error) {
+        console.error("Error during user signature verification:", error);
+        res.status(500).json({ error: 'Server error during verification.' });
+    }
+});
+
+// --- User Profile Endpoints ---
+
+/**
+ * @api {get} /user/profile
+ * Gets the profile of the currently logged-in user. (Protected)
+ */
+app.get('/user/profile', authenticateUser, async (req, res) => {
+    try {
+        const db = await dbPromise;
+        // req.user is populated by the authenticateUser middleware
+        const userProfile = await db.get('SELECT id, wallet_address, display_name, avatar_url, email, joined_at FROM users WHERE id = ?', req.user.userId);
+        
+        if (!userProfile) {
+            return res.status(404).json({ error: 'User profile not found.' });
+        }
+        res.status(200).json(userProfile);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch user profile.' });
+    }
+});
+
+/**
+ * @api {put} /user/profile
+ * Updates the profile of the currently logged-in user. (Protected)
+ * @body {string} displayName
+ * @body {string} email
+ */
+app.put('/user/profile', authenticateUser, async (req, res) => {
+    const { displayName, email } = req.body;
+    // We don't allow changing avatar via this endpoint for simplicity,
+    // that would typically be a separate file upload endpoint.
+
+    try {
+        const db = await dbPromise;
+        await db.run(
+            'UPDATE users SET display_name = ?, email = ? WHERE id = ?',
+            [displayName, email, req.user.userId]
+        );
+        res.status(200).json({ message: 'Profile updated successfully.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update user profile.' });
     }
 });
 
