@@ -23,3 +23,28 @@ CREATE TABLE IF NOT EXISTS claims (
     FOREIGN KEY(eventId) REFERENCES events(id),
     UNIQUE(eventId, attendeeAddress)
 );
+
+-- Table to store organization profiles and login credentials
+CREATE TABLE IF NOT EXISTS organizations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    logo_url TEXT,
+    website TEXT,
+    industry TEXT,
+    country TEXT,
+    city TEXT,
+    admin_name TEXT NOT NULL,
+    admin_email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table to store profiles for users/attendees
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet_address TEXT NOT NULL UNIQUE,
+    display_name TEXT,
+    avatar_url TEXT,
+    email TEXT,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
