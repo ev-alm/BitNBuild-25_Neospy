@@ -1,3 +1,4 @@
+// src/components/AuthenticatedLayout.tsx
 import { 
   LogOut, 
   Sparkles, 
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { useLocation, useNavigate } from 'react-router-dom'; // Import useLocation and useNavigate
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -25,18 +27,23 @@ interface AuthenticatedLayoutProps {
     walletAddress: string;
   };
   onLogout: () => void;
-  currentPage: string;
-  onPageChange: (page: string) => void;
+  // currentPage and onPageChange are kept to maintain the interface,
+  // but internal navigation logic now relies on react-router-dom hooks.
+  currentPage: string; 
+  onPageChange: (page: string) => void; 
 }
 
 export default function AuthenticatedLayout({ 
   children, 
   user, 
   onLogout, 
-  currentPage, 
-  onPageChange 
+  currentPage, // Kept to satisfy the prop type
+  onPageChange // Kept to satisfy the prop type
 }: AuthenticatedLayoutProps) {
   
+  const location = useLocation(); // Get the current location object from react-router-dom
+  const navigate = useNavigate(); // Get the navigate function from react-router-dom
+
   const organizerNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Calendar },
     { id: 'create', label: 'Create Event', icon: Plus },
@@ -76,12 +83,16 @@ export default function AuthenticatedLayout({
               <div className="flex items-center space-x-1">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = currentPage === item.id;
+                  // Determine if the current item is active based on the URL pathname
+                  // '/dashboard' can also be '/' for the root authenticated path
+                  const isActive = location.pathname === `/${item.id}` || 
+                                   (item.id === 'dashboard' && location.pathname === '/');
                   
                   return (
                     <button
                       key={item.id}
-                      onClick={() => onPageChange(item.id)}
+                      // Use navigate to change the URL, making navigation work
+                      onClick={() => navigate(item.id === 'dashboard' ? '/' : `/${item.id}`)}
                       className={`
                         flex items-center space-x-2 px-4 py-2.5 rounded-lg transition-all duration-200 font-medium
                         ${isActive 
