@@ -4,6 +4,8 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 import BadgeCard from './BadgeCard';
 import ClaimPage from './ClaimPage';
 import CollectionPage from './CollectionPage';
+import UserSettings from './WalletCard';
+import ToastSystem, { useToast } from './ToastSystem';
 
 interface UserDashboardProps {
   user: {
@@ -15,6 +17,8 @@ interface UserDashboardProps {
     walletAddress: string;
   };
   onToast: (message: string, type: 'success' | 'error' | 'info') => void;
+  onUpdateUser: (updatedUser: Partial<UserDashboardProps['user']>) => void;
+  currentPage: string;
 }
 
 interface Badge {
@@ -29,7 +33,7 @@ interface Badge {
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
 
-export default function UserDashboard({ user, onToast }: UserDashboardProps) {
+export default function UserDashboard({ user, onToast, onUpdateUser, currentPage }: UserDashboardProps) {
   const [activeTab, setActiveTab] = useState<'discover' | 'collection' | 'claim'>('discover');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,11 +106,22 @@ export default function UserDashboard({ user, onToast }: UserDashboardProps) {
     }
   };
 
-  if (activeTab === 'claim') {
+  // Handle navigation from AuthenticatedLayout
+  if (currentPage === 'wallet') {
+    return (
+      <UserSettings
+        user={user}
+        onUpdateUser={onUpdateUser}
+        onLogout={() => onToast('Use the logout button in the navigation bar', 'info')}
+      />
+    );
+  }
+
+  if (activeTab === 'claim' || currentPage === 'claim') {
     return <ClaimPage onBack={() => setActiveTab('discover')} onToast={onToast} />;
   }
 
-  if (activeTab === 'collection') {
+  if (activeTab === 'collection' || currentPage === 'collection') {
     return <CollectionPage badges={collectedBadges} onBack={() => setActiveTab('discover')} />;
   }
 

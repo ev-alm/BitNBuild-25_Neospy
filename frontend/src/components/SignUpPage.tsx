@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react'; // Import useRef
 import { Eye, EyeOff, ArrowLeft, Mail, Lock, User as UserIcon, Users, Award, Upload, Check, Building, Briefcase, MapPin, Globe, Wallet, X } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback'; 
 import { AnimatePresence, motion } from 'framer-motion';
@@ -62,7 +62,7 @@ export default function SignUpPage({ onSignUp, onSwitchToLogin }: SignUpPageProp
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', confirmPassword: '',
     role: 'user' as 'organizer' | 'user',
-    avatar: 'https://images.unsplash.com/photo-1704726135027-9c6f034cfa41',
+    avatar: 'https://images.unsplash.com/photo-1704726135027-9c6f034cfa41', // Default avatar
     orgName: '', orgLogo: '', orgWebsite: '', orgIndustry: '', orgCountry: '', orgCity: '', walletAddress: '',
   });
   const [organizerStep, setOrganizerStep] = useState(1);
@@ -70,19 +70,36 @@ export default function SignUpPage({ onSignUp, onSwitchToLogin }: SignUpPageProp
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [avatarUploaded, setAvatarUploaded] = useState(false);
+  const [avatarUploaded, setAvatarUploaded] = useState(false); // Re-enabled
+  const [orgLogoUploaded, setOrgLogoUploaded] = useState(false); // New state for org logo upload status
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+
+  // Refs for hidden file inputs
+  const userAvatarInputRef = useRef<HTMLInputElement>(null);
+  const orgLogoInputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({...prev, [field]: ''}));
   };
 
-  const handleAvatarUpload = (target: 'user' | 'organizer') => {
-    setAvatarUploaded(true);
-    const avatars = ['https://images.unsplash.com/photo-1704726135027-9c6f034cfa41', 'https://images.unsplash.com/photo-1494790108755-2616b484e9c0', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d'];
-    const field = target === 'user' ? 'avatar' : 'orgLogo';
-    handleInputChange(field, avatars[Math.floor(Math.random() * avatars.length)]);
+  // Re-enabled image upload functionality
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, target: 'user' | 'organizer') => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const imageUrl = reader.result as string; // Data URL for display
+        const field = target === 'user' ? 'avatar' : 'orgLogo';
+        setFormData(prev => ({ ...prev, [field]: imageUrl }));
+        if (target === 'user') {
+            setAvatarUploaded(true);
+        } else {
+            setOrgLogoUploaded(true);
+        }
+      };
+      reader.readAsDataURL(file); // Read the file as a Data URL
+    }
   };
   
   const validateOrganizerStep = (step: number) => {
@@ -185,7 +202,28 @@ export default function SignUpPage({ onSignUp, onSwitchToLogin }: SignUpPageProp
                     <h3 className="text-lg font-semibold text-center text-slate-700">Complete Your Profile (Optional)</h3>
                     <InputField icon={UserIcon} id="name" label="Display Name / Nickname" value={formData.name} onChange={handleInputChange} placeholder="e.g., Shravani" isRequired={false} />
                     <InputField icon={Mail} id="email" label="Email for Notifications" type="email" value={formData.email} onChange={handleInputChange} placeholder="your@email.com" isRequired={false} />
-                    <div className="mb-6"><label className="block text-sm font-medium text-slate-700 mb-3">Profile picture</label><div className="flex items-center space-x-4"><div className="w-16 h-16 rounded-full overflow-hidden border-2"><ImageWithFallback src={formData.avatar} alt="Avatar" className="w-full h-full" /></div><button type="button" onClick={() => handleAvatarUpload('user')} className="flex items-center space-x-2 px-4 py-2 bg-slate-100 rounded-lg">{avatarUploaded ? (<><Check className="w-4 h-4 text-green-600" /><span>Uploaded</span></>) : (<><Upload className="w-4 h-4" /><span>Upload</span></>)}</button></div></div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-slate-700 mb-3">Profile picture</label>
+                        <div className="flex items-center space-x-4">
+                            <div className="w-16 h-16 rounded-full overflow-hidden border-2">
+                                <ImageWithFallback src={formData.avatar} alt="Avatar" className="w-full h-full" />
+                            </div>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                ref={userAvatarInputRef}
+                                onChange={(e) => handleFileChange(e, 'user')}
+                                className="hidden"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => userAvatarInputRef.current?.click()}
+                                className="flex items-center space-x-2 px-4 py-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                                {avatarUploaded ? (<><Check className="w-4 h-4 text-green-600" /><span>Uploaded</span></>) : (<><Upload className="w-4 h-4" /><span>Upload</span></>)}
+                            </button>
+                        </div>
+                    </div>
                     <Button type="submit" disabled={isLoading} className="w-full gradient-button py-3">{isLoading ? "Creating Profile..." : "Create Profile"}</Button>
                 </motion.div>
             )}
@@ -195,7 +233,28 @@ export default function SignUpPage({ onSignUp, onSwitchToLogin }: SignUpPageProp
 
   const renderOrganizerStep1 = () => (
     <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} transition={{ duration: 0.3 }}>
-      <div className="mb-6"><label className="block text-sm font-medium text-slate-700 mb-3">Organization logo</label><div className="flex items-center space-x-4"><div className="w-16 h-16 rounded-full overflow-hidden border-2"><ImageWithFallback src={formData.orgLogo} alt="Org Logo" className="w-full h-full" /></div><button type="button" onClick={() => handleAvatarUpload('organizer')} className="flex items-center space-x-2 px-4 py-2 bg-slate-100 rounded-lg"><Upload className="w-4 h-4" /><span>Upload</span></button></div></div>
+      <div className="mb-6">
+          <label className="block text-sm font-medium text-slate-700 mb-3">Organization logo</label>
+          <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2">
+                  <ImageWithFallback src={formData.orgLogo} alt="Org Logo" className="w-full h-full" />
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                ref={orgLogoInputRef}
+                onChange={(e) => handleFileChange(e, 'organizer')}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => orgLogoInputRef.current?.click()}
+                className="flex items-center space-x-2 px-4 py-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                  {orgLogoUploaded ? (<><Check className="w-4 h-4 text-green-600" /><span>Uploaded</span></>) : (<><Upload className="w-4 h-4" /><span>Upload</span></>)}
+              </button>
+          </div>
+      </div>
       <div className="space-y-6">
         <InputField icon={Building} id="orgName" label="Organization Name" value={formData.orgName} onChange={handleInputChange} error={errors.orgName} placeholder="Your Company Inc." />
         <InputField icon={Globe} id="orgWebsite" label="Website (Optional)" value={formData.orgWebsite} onChange={handleInputChange} placeholder="https://yourcompany.com" isRequired={false} />

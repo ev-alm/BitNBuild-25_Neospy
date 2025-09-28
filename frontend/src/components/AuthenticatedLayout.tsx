@@ -19,7 +19,7 @@ import { useLocation, useNavigate } from 'react-router-dom'; // Import useLocati
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
   user: {
-    name: string;
+    name: string; // This should be the user's personal name
     email: string;
     avatar: string;
     role: 'organizer' | 'user';
@@ -129,6 +129,7 @@ export default function AuthenticatedLayout({
                     </AvatarFallback>
                   </Avatar>
                   <div className="hidden lg:block">
+                    {/* This is where user.name is displayed. It should contain the admin's name for organizers. */}
                     <p className="text-sm font-semibold text-slate-900">{user.name}</p>
                     <p className="text-xs text-slate-500">{user.email}</p>
                   </div>

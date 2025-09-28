@@ -55,18 +55,27 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const isLoggingOutRef = useRef(false);
+  const hasShownSessionExpiredToast = useRef(false); // NEW: Add this ref to track toast display
 
   useEffect(() => {
-    // This effect correctly handles redirects and session expiry. No changes needed here.
+    // This effect correctly handles redirects and session expiry.
     if (!user && !isLoggingOutRef.current && (location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/signup')) {
-      addToast('Your session has expired or you have been logged out.', 'error');
+      // NEW: Only add the toast if it hasn't been shown yet for this session expiry event
+      if (!hasShownSessionExpiredToast.current) {
+        addToast('Your session has expired or you have been logged out.', 'error');
+        hasShownSessionExpiredToast.current = true; // Set the flag
+      }
       navigate('/', { replace: true });
     } 
+    // NEW: Reset the flag if the user successfully logs in and navigates to dashboard
     else if (user && (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup')) {
       navigate('/dashboard', { replace: true });
+      hasShownSessionExpiredToast.current = false; 
     }
+    // NEW: Reset the flag after a controlled logout finishes redirecting
     if (isLoggingOutRef.current && !user && location.pathname === '/') {
       isLoggingOutRef.current = false;
+      hasShownSessionExpiredToast.current = false; 
     }
   }, [user, location.pathname, navigate, addToast]);
 
@@ -91,6 +100,7 @@ function AppContent() {
       setUser(newUser);
       navigate('/dashboard', { replace: true }); // Use navigate instead of setState
       addToast('Organizer account created successfully!', 'success');
+      hasShownSessionExpiredToast.current = false; // NEW: Reset on successful signup
 
     } else {
       // This is your original ATTENDEE (user) signup flow from the new file, it remains unchanged
@@ -106,6 +116,7 @@ function AppContent() {
       setUser(newUser);
       navigate('/dashboard', { replace: true }); // Use navigate instead of setState
       addToast('Attendee account created successfully!', 'success');
+      hasShownSessionExpiredToast.current = false; // NEW: Reset on successful signup
     }
   };
 
@@ -123,6 +134,7 @@ function AppContent() {
     setUser(mockUser);
     navigate('/dashboard', { replace: true });
     addToast('Login successful!', 'success');
+    hasShownSessionExpiredToast.current = false; // NEW: Reset on successful login
   };
 
   // This is the handleLogout function from your new file, it remains unchanged
@@ -132,6 +144,7 @@ function AppContent() {
     setSelectedRole(null);
     navigate('/', { replace: true });
     addToast('You have been logged out.', 'success');
+    hasShownSessionExpiredToast.current = false; // NEW: Ensure flag is reset on explicit logout
   };
 
   const handleRoleSelection = (role: 'organizer' | 'user') => {
@@ -174,7 +187,9 @@ function AppContent() {
           <Route path="/dashboard" element={user?.role === 'organizer' ? (
             <OrganizerDashboard user={user as User} onToast={addToast as any} /> 
           ) : (
-            <UserDashboard user={user as User} onToast={addToast as any} />
+            <UserDashboard user={user as User} onToast={addToast as any} onUpdateUser={function (updatedUser: Partial<{ name: string; email: string; avatar: string; role: 'organizer' | 'user'; walletBalance: string; walletAddress: string; }>): void {
+                throw new Error('Function not implemented.');
+              } } currentPage={''} />
           )} />
 
           {user?.role === 'organizer' && (

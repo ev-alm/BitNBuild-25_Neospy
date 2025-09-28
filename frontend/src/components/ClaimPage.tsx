@@ -5,10 +5,11 @@ import BadgeCard from './BadgeCard';
 import ConfettiEffect from './ConfettiEffect';
 
 interface ClaimPageProps {
-  onToast: (toast: { title: string; description?: string; type: 'success' | 'error' | 'info' }) => void;
+  onToast: (message: string, type: 'success' | 'error' | 'info') => void;
+  onBack: () => void;
 }
 
-export default function ClaimPage({ onToast }: ClaimPageProps) {
+export default function ClaimPage({ onToast, onBack }: ClaimPageProps) {
   const [claimState, setClaimState] = useState<'idle' | 'claiming' | 'claimed'>('idle');
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -36,11 +37,7 @@ export default function ClaimPage({ onToast }: ClaimPageProps) {
     const hash = `0x${Math.random().toString(16).substr(2, 64)}`;
     
     // Show success toast
-    onToast({
-      title: '🎉 Badge Claimed Successfully!',
-      description: `You've earned the ${eventBadge.name} badge`,
-      type: 'success'
-    });
+    onToast(`🎉 Badge Claimed Successfully! You've earned the ${eventBadge.name} badge`, 'success');
     
     // Hide confetti after animation
     setTimeout(() => setShowConfetti(false), 3000);
